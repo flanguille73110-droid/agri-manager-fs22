@@ -115,6 +115,7 @@ const STATUS_ORDER: { key: keyof Field; label: string; color: string }[] = [
   { key: 'needsPlowing', label: 'Labour', color: 'bg-emerald-500' },
   { key: 'needsStoneRemoval', label: 'Pierres', color: 'bg-emerald-500' },
   { key: 'needsSowing', label: 'Semis', color: 'bg-emerald-500' },
+  { key: 'needsGrowing', label: 'En croissance', color: 'bg-emerald-500' },
 ];
 
 const COW_CAPACITIES = {
@@ -139,7 +140,7 @@ const CHICKEN_CAPACITIES = {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'fields' | 'animals' | 'shortcuts' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'home' | 'dashboard' | 'fields' | 'animals' | 'shortcuts' | 'settings'>('home');
   const [activeSettingsTab, setActiveSettingsTab] = useState<'rotations' | 'tools' | 'vehicles'>('rotations');
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   
@@ -181,8 +182,8 @@ const App: React.FC = () => {
       month: 7, // August (Index starts at 0 for Jan, so 7 is Aug)
       year: 1,
       fields: [
-        { id: '1', number: 1, size: 2.5, crop: CropType.WHEAT, status: FieldStatus.GROWING, fertilizer: 50, needsLime: false, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsStoneRemoval: false, needsHarvest: false, yieldPotential: 95, nextCrop: CropType.BARLEY, sownIn: 9, currentTool: 'Aucun' },
-        { id: '2', number: 2, size: 1.2, crop: CropType.BARLEY, status: FieldStatus.HARVESTING, fertilizer: 100, needsLime: true, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsStoneRemoval: false, needsHarvest: true, yieldPotential: 110, nextCrop: CropType.CANOLA, sownIn: 9, currentTool: 'Aucun' }
+        { id: '1', number: 1, size: 2.5, crop: CropType.WHEAT, status: FieldStatus.GROWING, fertilizer: 50, needsLime: false, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: true, needsStoneRemoval: false, needsHarvest: false, yieldPotential: 95, nextCrop: CropType.BARLEY, sownIn: 9, currentTool: 'Aucun' },
+        { id: '2', number: 2, size: 1.2, crop: CropType.BARLEY, status: FieldStatus.HARVESTING, fertilizer: 100, needsLime: true, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: false, needsStoneRemoval: false, needsHarvest: true, yieldPotential: 110, nextCrop: CropType.CANOLA, sownIn: 9, currentTool: 'Aucun' }
       ],
       animals: [
         { id: 'a1', type: AnimalType.COWS, name: 'Moutons', count: 12, health: 90, foodLevel: 80, waterLevel: 100, productivity: 85, lastFed: new Date().toISOString() }
@@ -210,6 +211,7 @@ const App: React.FC = () => {
       needsSlurry: false,
       needsMulching: false,
       needsSowing: false,
+      needsGrowing: false,
       needsStoneRemoval: false,
       needsHarvest: false,
       yieldPotential: 100,
@@ -242,6 +244,30 @@ const App: React.FC = () => {
       lastFed: new Date().toISOString()
     };
     setGameState(prev => ({ ...prev, animals: [...prev.animals, newPen] }));
+  };
+
+  const advanceMonth = () => {
+    setGameState(prev => {
+      let nextMonth = prev.month + 1;
+      let nextYear = prev.year;
+      if (nextMonth >= 12) {
+        nextMonth = 0;
+        nextYear += 1;
+      }
+      return { ...prev, month: nextMonth, year: nextYear };
+    });
+  };
+
+  const regressMonth = () => {
+    setGameState(prev => {
+      let nextMonth = prev.month - 1;
+      let nextYear = prev.year;
+      if (nextMonth < 0) {
+        nextMonth = 11;
+        nextYear -= 1;
+      }
+      return { ...prev, month: nextMonth, year: nextYear };
+    });
   };
 
   const updateField = (id: string, updates: Partial<Field>) => {
@@ -364,6 +390,7 @@ const App: React.FC = () => {
       needsSlurry: false,
       needsMulching: false,
       needsSowing: false,
+      needsGrowing: false,
       needsStoneRemoval: false,
       needsHarvest: false,
       yieldPotential: 100,
@@ -450,8 +477,19 @@ const App: React.FC = () => {
           </div>
           <h1 className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">AgriManager</h1>
         </div>
+
+        <div className="flex items-center gap-3 mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400">
+            <Icons.Calendar />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mois en cours</div>
+            <div className="text-sm font-bold text-white">{MONTHS[gameState.month]}</div>
+          </div>
+        </div>
         
         <div className="space-y-2">
+          <NavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedFieldId(null); }} icon={<Icons.Home />} label="Accueil" />
           <NavItem active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Véhicules" />
           <NavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
           <NavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Animaux" />
@@ -461,7 +499,14 @@ const App: React.FC = () => {
       </nav>
 
       {/* Bottom Navigation (Mobile) */}
+      <div className="md:hidden fixed bottom-16 left-0 right-0 h-10 bg-slate-900/90 backdrop-blur-sm border-t border-slate-800 flex items-center justify-center gap-2 px-4 z-50">
+        <div className="w-6 h-6 bg-emerald-500/20 rounded flex items-center justify-center text-emerald-400">
+          <Icons.Calendar />
+        </div>
+        <span className="text-xs font-bold text-white uppercase tracking-wider">{MONTHS[gameState.month]}</span>
+      </div>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 z-50">
+        <MobileNavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedFieldId(null); }} icon={<Icons.Home />} label="Accueil" />
         <MobileNavItem active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Véhicules" />
         <MobileNavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
         <MobileNavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Bêtes" />
@@ -472,6 +517,125 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="p-4 md:p-8 max-w-6xl mx-auto">
         
+        {activeTab === 'home' && (
+          <div className="max-w-4xl mx-auto space-y-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Accueil</h2>
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Mois en cours</label>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-emerald-500/20 rounded-lg flex items-center justify-center text-emerald-400">
+                        <Icons.Calendar />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">{MONTHS[gameState.month]}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={regressMonth}
+                        className="w-10 h-10 bg-slate-700 hover:bg-slate-600 text-white rounded-full flex items-center justify-center transition-colors border border-slate-600"
+                        title="Mois précédent"
+                      >
+                        <Icons.ChevronLeft />
+                      </button>
+                      <button 
+                        onClick={advanceMonth}
+                        className="w-10 h-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 rounded-full flex items-center justify-center transition-colors shadow-lg shadow-emerald-500/20"
+                        title="Passer au mois suivant"
+                      >
+                        <Icons.ChevronRight />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <h3 className="text-lg font-bold text-white mb-4">Champs a récolter</h3>
+              <div className="space-y-3">
+                {gameState.fields.filter(field => {
+                  if (field.sownIn === undefined) return false;
+                  const growth = GROWTH_TIMES[field.crop] || 5;
+                  const harvestMonthIndex = (field.sownIn + growth) % 12;
+                  return harvestMonthIndex === gameState.month;
+                }).length > 0 ? (
+                  gameState.fields
+                    .filter(field => {
+                      if (field.sownIn === undefined) return false;
+                      const growth = GROWTH_TIMES[field.crop] || 5;
+                      const harvestMonthIndex = (field.sownIn + growth) % 12;
+                      return harvestMonthIndex === gameState.month;
+                    })
+                    .map(field => (
+                      <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white">
+                            {field.number}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">{field.crop}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                          À récolter
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <div className="text-center py-8 text-slate-500 italic text-sm">
+                    Aucun champ à récolter ce mois-ci.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <h3 className="text-lg font-bold text-white mb-4">Champs bientôt a récolter</h3>
+              <div className="space-y-3">
+                {gameState.fields.filter(field => {
+                  if (field.sownIn === undefined) return false;
+                  const growth = GROWTH_TIMES[field.crop] || 5;
+                  const harvestMonthIndex = (field.sownIn + growth) % 12;
+                  const nextMonthIndex = (gameState.month + 1) % 12;
+                  return harvestMonthIndex === nextMonthIndex;
+                }).length > 0 ? (
+                  gameState.fields
+                    .filter(field => {
+                      if (field.sownIn === undefined) return false;
+                      const growth = GROWTH_TIMES[field.crop] || 5;
+                      const harvestMonthIndex = (field.sownIn + growth) % 12;
+                      const nextMonthIndex = (gameState.month + 1) % 12;
+                      return harvestMonthIndex === nextMonthIndex;
+                    })
+                    .map(field => (
+                      <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white">
+                            {field.number}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">{field.crop}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                          Mois prochain
+                        </div>
+                      </div>
+                    ))
+                ) : (
+                  <div className="text-center py-8 text-slate-500 italic text-sm">
+                    Aucun champ à récolter le mois prochain.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'dashboard' && (
           <div className="space-y-6">
             {selectedFieldId === null ? (
@@ -598,6 +762,7 @@ const App: React.FC = () => {
                         field={getFieldByNumber(selectedFieldId)} 
                         onUpdate={(updates) => saveFieldByNumber(selectedFieldId, updates)}
                         toolAssignments={gameState.toolAssignments || DEFAULT_TOOL_ASSIGNMENTS}
+                        currentMonth={gameState.month}
                     />
                 </div>
             ) : (
@@ -620,36 +785,42 @@ const App: React.FC = () => {
                                     borderColor = "border-slate-700";
                                     bgClass = "bg-slate-900/80 hover:bg-slate-800";
                                     
-                                    if (!field.isWaiting) {
-                                        statusText = "Libre";
-                                        statusColor = "text-slate-500";
-                                        bgClass = "bg-slate-900";
-                                    } else if (!field.needsLime) {
-                                        statusText = "Chaux";
-                                        statusColor = "text-teal-400";
-                                        borderColor = "border-teal-500/30";
-                                    } else if (!field.needsSlurry) {
-                                        statusText = "Lisier";
-                                        statusColor = "text-lime-400";
-                                        borderColor = "border-lime-500/30";
-                                    } else if (!field.needsMulching) {
-                                        statusText = "Broyage";
+                                    if (field.needsGrowing) {
+                                        statusText = "À Récolter";
                                         statusColor = "text-yellow-400";
                                         borderColor = "border-yellow-500/30";
-                                    } else if (!field.needsPlowing) {
-                                        statusText = "Labour";
-                                        statusColor = "text-orange-400";
-                                        borderColor = "border-orange-500/30";
-                                    } else if (!field.needsStoneRemoval) {
-                                        statusText = "Pierres";
-                                        statusColor = "text-stone-400";
-                                        borderColor = "border-stone-500/30";
-                                    } else if (!field.needsSowing) {
-                                        statusText = "Semis";
-                                        statusColor = "text-blue-400";
-                                        borderColor = "border-blue-500/30";
+                                    } else if (field.needsSowing) {
+                                        const growth = GROWTH_TIMES[field.crop] || 0;
+                                        const progress = field.sownIn !== undefined ? Math.min((gameState.month - field.sownIn + 12) % 12, growth) : 0;
+                                        statusText = `En croissance ${progress}/${growth}`;
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.needsStoneRemoval) {
+                                        statusText = "À semer";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.needsPlowing) {
+                                        statusText = "Enlever les pierres";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.needsMulching) {
+                                        statusText = "À Labourer";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.needsSlurry) {
+                                        statusText = "À Broyer";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.needsLime) {
+                                        statusText = "À Amender en lisier";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
+                                    } else if (field.isWaiting) {
+                                        statusText = "À Chauler";
+                                        statusColor = "text-emerald-400";
+                                        borderColor = "border-emerald-500/30";
                                     } else {
-                                        statusText = "En cours";
+                                        statusText = "en attente";
                                         statusColor = "text-emerald-400";
                                         borderColor = "border-emerald-500/30";
                                     }
@@ -1061,9 +1232,10 @@ interface FieldCardProps {
   field: Field;
   onUpdate: (updates: Partial<Field>) => void;
   toolAssignments: Record<string, CropType[]>;
+  currentMonth: number;
 }
 
-const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
+const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth }: FieldCardProps) => {
   const calculateHarvestMonth = (crop: CropType, sownIn?: number) => {
       if (sownIn === undefined) return '...';
       const growth = GROWTH_TIMES[crop] || 5;
@@ -1080,7 +1252,17 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
   // Determine Next Tool Logic based on Current Tool
   const getNextTool = () => {
       const currentTool = field.currentTool;
-      if (!currentTool) return '-';
+      
+      if (!currentTool || currentTool === 'Aucun') {
+          if (field.needsSowing && !field.needsGrowing) {
+              if ([CropType.OAT, CropType.CANOLA, CropType.BARLEY, CropType.WHEAT].includes(field.crop)) return "JD X9 grande barre de coupe";
+              if ([CropType.CORN, CropType.SUNFLOWER].includes(field.crop)) return "JD X9 barre maïs tournesol";
+              if (field.crop === CropType.POTATO) return "Ventor";
+              if (field.crop === CropType.SUGARBEET) return "Rexor";
+              if (field.crop === CropType.GRASS) return "Faucheuse";
+          }
+          return '-';
+      }
 
       // Check if current tool is a harvester
       if (HARVESTERS.includes(currentTool)) {
@@ -1138,7 +1320,8 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
     field.needsMulching &&
     field.needsPlowing &&
     field.needsStoneRemoval &&
-    field.needsSowing;
+    field.needsSowing &&
+    field.needsGrowing;
 
   const handleHarvest = () => {
     onUpdate({
@@ -1149,6 +1332,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
       needsPlowing: false,
       needsStoneRemoval: false,
       needsSowing: false,
+      needsGrowing: false,
       needsHarvest: false,
       currentTool: 'Aucun',
       lastCompletedTool: field.currentTool // The harvester becomes the completed tool
@@ -1300,6 +1484,14 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
                           } else {
                               updates.currentTool = "Semoir"; // Fallback
                           }
+                      } else if (item.key === 'needsGrowing') {
+                          // When "En croissance" is checked, currentTool should be the harvester
+                          if ([CropType.OAT, CropType.CANOLA, CropType.BARLEY, CropType.WHEAT].includes(field.crop)) updates.currentTool = "JD X9 grande barre de coupe";
+                          else if ([CropType.CORN, CropType.SUNFLOWER].includes(field.crop)) updates.currentTool = "JD X9 barre maïs tournesol";
+                          else if (field.crop === CropType.POTATO) updates.currentTool = "Ventor";
+                          else if (field.crop === CropType.SUGARBEET) updates.currentTool = "Rexor";
+                          else if (field.crop === CropType.GRASS) updates.currentTool = "Faucheuse";
+                          else updates.currentTool = "Aucun";
                       } else {
                           // Standard behavior for other tools (Chaux -> Lisier -> Broyer -> etc.)
                           if (TOOLS_LIST[index + 2]) {
@@ -1333,7 +1525,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
                           needsSowing: true,
                           crop: nextCropCycle,
                           sownIn: newSownIndex,
-                          currentTool: harvester,
+                          currentTool: 'Aucun',
                           lastCompletedTool: previousTool // Archive the planter/seeder
                       });
                   } else {
@@ -1349,7 +1541,14 @@ const FieldCard = ({ field, onUpdate, toolAssignments }: FieldCardProps) => {
                 <BadgeButton 
                   key={item.key}
                   active={isChecked} 
-                  label={item.label} 
+                  label={item.key === 'needsGrowing' && field.sownIn !== undefined ? (
+                    <div className="flex flex-col items-center">
+                      <span>{item.label}</span>
+                      <span className="text-[8px] opacity-80">
+                        ({Math.min((currentMonth - field.sownIn + 12) % 12, GROWTH_TIMES[field.crop] || 0)}/{(GROWTH_TIMES[field.crop] || 0)})
+                      </span>
+                    </div>
+                  ) : item.label} 
                   onClick={handleClick} 
                   color={item.color} 
                   disabled={isDisabled}
@@ -1869,7 +2068,7 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
   );
 };
 
-const BadgeButton: React.FC<{ active: boolean; label: string; onClick: () => void; color: string; disabled?: boolean }> = ({ active, label, onClick, color, disabled }) => (
+const BadgeButton: React.FC<{ active: boolean; label: React.ReactNode; onClick: () => void; color: string; disabled?: boolean }> = ({ active, label, onClick, color, disabled }) => (
   <button 
     onClick={onClick}
     disabled={disabled}

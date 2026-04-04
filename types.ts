@@ -47,6 +47,7 @@ export interface Field {
   needsSlurry: boolean; // Lisier
   needsMulching: boolean; // Broyer
   needsSowing: boolean; // Semis
+  needsGrowing: boolean; // En croissance
   needsStoneRemoval: boolean; // Pierres
   needsHarvest: boolean; // Récolter
   yieldPotential: number; // percentage
