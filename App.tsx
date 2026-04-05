@@ -797,32 +797,32 @@ const App: React.FC = () => {
                                         borderColor = "border-emerald-500/30";
                                     } else if (field.needsStoneRemoval) {
                                         statusText = "À semer";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-blue-400";
+                                        borderColor = "border-blue-500/30";
                                     } else if (field.needsPlowing) {
                                         statusText = "Enlever les pierres";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-stone-400";
+                                        borderColor = "border-stone-500/30";
                                     } else if (field.needsMulching) {
                                         statusText = "À Labourer";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-orange-400";
+                                        borderColor = "border-orange-500/30";
                                     } else if (field.needsSlurry) {
                                         statusText = "À Broyer";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-rose-400";
+                                        borderColor = "border-rose-500/30";
                                     } else if (field.needsLime) {
                                         statusText = "À Amender en lisier";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-lime-400";
+                                        borderColor = "border-lime-500/30";
                                     } else if (field.isWaiting) {
                                         statusText = "À Chauler";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-cyan-400";
+                                        borderColor = "border-cyan-500/30";
                                     } else {
                                         statusText = "en attente";
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
+                                        statusColor = "text-slate-500";
+                                        borderColor = "border-slate-800";
                                     }
                                 }
 
