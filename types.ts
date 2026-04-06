@@ -102,4 +102,5 @@ export interface GameState {
   animals: AnimalPen[];
   toolAssignments?: Record<string, CropType[]>;
   shortcuts?: Record<string, Shortcut[]>;
+  growthTimes?: Record<string, number>;
 }

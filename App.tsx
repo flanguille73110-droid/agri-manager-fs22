@@ -171,6 +171,10 @@ const App: React.FC = () => {
         if (!parsed.shortcuts || Object.keys(parsed.shortcuts).length === 0) {
             parsed.shortcuts = DEFAULT_SHORTCUTS;
         }
+        // Migration for growthTimes
+        if (!parsed.growthTimes || Object.keys(parsed.growthTimes).length === 0) {
+            parsed.growthTimes = GROWTH_TIMES;
+        }
         return parsed;
       } catch (e) {
         console.error("Error parsing saved game state, resetting:", e);
@@ -189,13 +193,24 @@ const App: React.FC = () => {
         { id: 'a1', type: AnimalType.COWS, name: 'Moutons', count: 12, health: 90, foodLevel: 80, waterLevel: 100, productivity: 85, lastFed: new Date().toISOString() }
       ],
       toolAssignments: DEFAULT_TOOL_ASSIGNMENTS,
-      shortcuts: DEFAULT_SHORTCUTS
+      shortcuts: DEFAULT_SHORTCUTS,
+      growthTimes: GROWTH_TIMES
     };
   });
 
   useEffect(() => {
     localStorage.setItem('fs22_manager_state', JSON.stringify(gameState));
   }, [gameState]);
+
+  const updateGrowthTime = (crop: string, months: number) => {
+    setGameState(prev => ({
+      ...prev,
+      growthTimes: {
+        ...(prev.growthTimes || GROWTH_TIMES),
+        [crop]: months
+      }
+    }));
+  };
 
   const addField = () => {
     const newField: Field = {
@@ -559,17 +574,18 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 {gameState.fields.filter(field => {
                   if (field.sownIn === undefined) return false;
-                  const growth = GROWTH_TIMES[field.crop] || 5;
+                  const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                   const harvestMonthIndex = (field.sownIn + growth) % 12;
                   return harvestMonthIndex === gameState.month;
                 }).length > 0 ? (
                   gameState.fields
                     .filter(field => {
                       if (field.sownIn === undefined) return false;
-                      const growth = GROWTH_TIMES[field.crop] || 5;
+                      const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                       const harvestMonthIndex = (field.sownIn + growth) % 12;
                       return harvestMonthIndex === gameState.month;
                     })
+                    .sort((a, b) => a.number - b.number)
                     .map(field => (
                       <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
                         <div className="flex items-center gap-3">
@@ -598,7 +614,7 @@ const App: React.FC = () => {
               <div className="space-y-3">
                 {gameState.fields.filter(field => {
                   if (field.sownIn === undefined) return false;
-                  const growth = GROWTH_TIMES[field.crop] || 5;
+                  const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                   const harvestMonthIndex = (field.sownIn + growth) % 12;
                   const nextMonthIndex = (gameState.month + 1) % 12;
                   return harvestMonthIndex === nextMonthIndex;
@@ -606,11 +622,12 @@ const App: React.FC = () => {
                   gameState.fields
                     .filter(field => {
                       if (field.sownIn === undefined) return false;
-                      const growth = GROWTH_TIMES[field.crop] || 5;
+                      const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                       const harvestMonthIndex = (field.sownIn + growth) % 12;
                       const nextMonthIndex = (gameState.month + 1) % 12;
                       return harvestMonthIndex === nextMonthIndex;
                     })
+                    .sort((a, b) => a.number - b.number)
                     .map(field => (
                       <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
                         <div className="flex items-center gap-3">
@@ -763,6 +780,7 @@ const App: React.FC = () => {
                         onUpdate={(updates) => saveFieldByNumber(selectedFieldId, updates)}
                         toolAssignments={gameState.toolAssignments || DEFAULT_TOOL_ASSIGNMENTS}
                         currentMonth={gameState.month}
+                        growthTimes={gameState.growthTimes || GROWTH_TIMES}
                     />
                 </div>
             ) : (
@@ -790,7 +808,7 @@ const App: React.FC = () => {
                                         statusColor = "text-yellow-400";
                                         borderColor = "border-yellow-500/30";
                                     } else if (field.needsSowing) {
-                                        const growth = GROWTH_TIMES[field.crop] || 0;
+                                        const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 0;
                                         const progress = field.sownIn !== undefined ? Math.min((gameState.month - field.sownIn + 12) % 12, growth) : 0;
                                         statusText = `En croissance ${progress}/${growth}`;
                                         statusColor = "text-emerald-400";
@@ -1145,7 +1163,17 @@ const App: React.FC = () => {
                     {ROTATION_ORDER.map((crop) => (
                       <div key={crop} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex justify-between items-center">
                           <span className="font-bold text-slate-200">{crop}</span>
-                          <span className="text-emerald-400 font-bold font-mono bg-emerald-500/10 px-3 py-1 rounded-lg">{GROWTH_TIMES[crop]} mois</span>
+                          <div className="flex items-center gap-2">
+                            <input 
+                              type="number" 
+                              min="1"
+                              max="24"
+                              value={gameState.growthTimes?.[crop] || GROWTH_TIMES[crop]}
+                              onChange={(e) => updateGrowthTime(crop, parseInt(e.target.value) || 1)}
+                              className="w-16 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-500"
+                            />
+                            <span className="text-slate-400 text-xs">mois</span>
+                          </div>
                       </div>
                     ))}
                   </div>
@@ -1233,12 +1261,13 @@ interface FieldCardProps {
   onUpdate: (updates: Partial<Field>) => void;
   toolAssignments: Record<string, CropType[]>;
   currentMonth: number;
+  growthTimes: Record<string, number>;
 }
 
-const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth }: FieldCardProps) => {
+const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes }: FieldCardProps) => {
   const calculateHarvestMonth = (crop: CropType, sownIn?: number) => {
       if (sownIn === undefined) return '...';
-      const growth = GROWTH_TIMES[crop] || 5;
+      const growth = growthTimes[crop] || 5;
       const harvestIndex = (sownIn + growth) % 12;
       return MONTHS[harvestIndex];
   };
@@ -1504,7 +1533,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth }: FieldCard
                   if (item.key === 'needsSowing' && !field.needsSowing) {
                       // 1. Calculate the Harvest Month of the *current* crop (before we change it) to set as the new Sown Month.
                       const currentSown = field.sownIn ?? 0;
-                      const growthTime = GROWTH_TIMES[field.crop] || 5;
+                      const growthTime = growthTimes[field.crop] || 5;
                       const newSownIndex = (currentSown + growthTime) % 12;
 
                       // 2. Determine the NEXT crop from the rotation list
@@ -1545,7 +1574,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth }: FieldCard
                     <div className="flex flex-col items-center">
                       <span>{item.label}</span>
                       <span className="text-[8px] opacity-80">
-                        ({Math.min((currentMonth - field.sownIn + 12) % 12, GROWTH_TIMES[field.crop] || 0)}/{(GROWTH_TIMES[field.crop] || 0)})
+                        ({Math.min((currentMonth - field.sownIn + 12) % 12, growthTimes[field.crop] || 0)}/{(growthTimes[field.crop] || 0)})
                       </span>
                     </div>
                   ) : item.label} 
