@@ -1341,6 +1341,68 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
   const highlightNext = isPrepComplete && !field.needsSowing;
   const highlightCurrent = !highlightNext;
 
+  const handleNextState = () => {
+    const previousTool = field.currentTool;
+    
+    if (!field.isWaiting) {
+        onUpdate({ 
+            isWaiting: true, 
+            currentTool: TOOLS_LIST[1],
+            lastCompletedTool: previousTool !== TOOLS_LIST[1] ? previousTool : field.lastCompletedTool
+        });
+        return;
+    }
+
+    const nextIndex = STATUS_ORDER.findIndex(item => !field[item.key]);
+    if (nextIndex !== -1) {
+        const item = STATUS_ORDER[nextIndex];
+        const updates: Partial<Field> = {};
+        (updates as any)[item.key] = true;
+
+        if (item.key === 'needsStoneRemoval') {
+            if (nextCrop) {
+                const isPotato = toolAssignments["Planteuse a PDT"]?.includes(nextCrop);
+                updates.currentTool = isPotato ? "Planteuse a PDT" : "Semoir";
+            } else {
+                updates.currentTool = "Semoir";
+            }
+        } else if (item.key === 'needsGrowing') {
+            if ([CropType.OAT, CropType.CANOLA, CropType.BARLEY, CropType.WHEAT].includes(field.crop)) updates.currentTool = "JD X9 grande barre de coupe";
+            else if ([CropType.CORN, CropType.SUNFLOWER].includes(field.crop)) updates.currentTool = "JD X9 barre maïs tournesol";
+            else if (field.crop === CropType.POTATO) updates.currentTool = "Ventor";
+            else if (field.crop === CropType.SUGARBEET) updates.currentTool = "Rexor";
+            else if (field.crop === CropType.GRASS) updates.currentTool = "Faucheuse";
+            else updates.currentTool = "Aucun";
+        } else {
+            if (TOOLS_LIST[nextIndex + 2]) {
+                updates.currentTool = TOOLS_LIST[nextIndex + 2];
+            }
+        }
+
+        if (item.key === 'needsSowing') {
+            const currentSown = field.sownIn ?? 0;
+            const growthTime = growthTimes[field.crop] || 5;
+            const newSownIndex = (currentSown + growthTime) % 12;
+            const currentCropIndex = ROTATION_ORDER.indexOf(field.crop);
+            const nextCropCycle = ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length];
+            
+            onUpdate({
+                ...updates,
+                needsSowing: true,
+                crop: nextCropCycle,
+                sownIn: newSownIndex,
+                currentTool: 'Aucun',
+                lastCompletedTool: previousTool
+            });
+        } else {
+            if (updates.currentTool && updates.currentTool !== previousTool) {
+                updates.lastCompletedTool = previousTool;
+            }
+            onUpdate(updates);
+        }
+    }
+  };
+
   // Check if all states are validated (for enabling Harvest Button)
   const allStatesValidated = 
     field.isWaiting &&
@@ -1351,6 +1413,27 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
     field.needsStoneRemoval &&
     field.needsSowing &&
     field.needsGrowing;
+
+  const currentStatusIndex = [...STATUS_ORDER].reverse().findIndex(item => !!field[item.key]);
+  const actualCurrentIndex = currentStatusIndex !== -1 ? STATUS_ORDER.length - 1 - currentStatusIndex : -1;
+  const nextStatusIndex = STATUS_ORDER.findIndex(item => !field[item.key]);
+
+  const getStatusLabel = (item: typeof STATUS_ORDER[0]) => {
+    if (item.key === 'needsGrowing' && field.sownIn !== undefined) {
+        const growth = growthTimes[field.crop] || 0;
+        const progress = Math.min((currentMonth - field.sownIn + 12) % 12, growth);
+        return `${item.label} ${progress}/${growth}`;
+    }
+    return item.label;
+  };
+
+  const currentStatusLabel = actualCurrentIndex !== -1 
+    ? getStatusLabel(STATUS_ORDER[actualCurrentIndex])
+    : field.isWaiting ? "Attente" : "-";
+
+  const nextStatusLabel = nextStatusIndex !== -1 
+    ? STATUS_ORDER[nextStatusIndex].label
+    : null;
 
   const handleHarvest = () => {
     onUpdate({
@@ -1447,156 +1530,52 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
         {/* Right Column: Status Toggles */}
         <div className="md:w-48 flex flex-col gap-2 pt-2 md:border-l md:border-slate-800 md:pl-6">
             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1 hidden md:block">État</p>
-            {/* Attente is always enabled as per requirements, but locked if active and harvest not done */}
-            <BadgeButton 
-                active={field.isWaiting} 
-                label="Attente" 
-                onClick={() => {
-                    const newVal = !field.isWaiting;
-                    const updates: Partial<Field> = { isWaiting: newVal };
-                    const previousTool = field.currentTool;
-
-                    // If turning off Attente, and no other status is active, reset tool to "Aucun"
-                    if (!newVal) {
-                        const othersActive = STATUS_ORDER.some(s => field[s.key]);
-                        if (!othersActive) {
-                            updates.currentTool = "Aucun";
-                        }
-                    } else {
-                        // Turning ON: Advance tool to next after "Aucun"
-                        updates.currentTool = TOOLS_LIST[1];
-                    }
-
-                    if (updates.currentTool && updates.currentTool !== previousTool) {
-                        updates.lastCompletedTool = previousTool;
-                    }
-                    onUpdate(updates);
-                }} 
-                color="bg-emerald-500"
-                disabled={(!field.isWaiting && (field.currentTool || 'Aucun') !== 'Aucun') || (field.isWaiting && !isHarvestDone)}
-            />
-            
-            {/* Dependent Items */}
-            {STATUS_ORDER.map((item, index) => {
-              const isChecked = field[item.key] as boolean;
-              let isDisabled = false;
-
-              if (isChecked) {
-                  // If checked, can only uncheck if harvest is done
-                  if (!isHarvestDone) isDisabled = true;
-              } else {
-                  // If unchecked, can only check if previous is done
-                  if (index === 0) {
-                      if (!field.isWaiting) isDisabled = true;
-                  } else {
-                      const prevKey = STATUS_ORDER[index - 1].key;
-                      if (!field[prevKey]) isDisabled = true;
-                  }
-              }
-
-              const handleClick = () => {
-                  if (isDisabled) return;
-
-                  const updates: Partial<Field> = {};
-                  const nextVal = !field[item.key];
-                  (updates as any)[item.key] = nextVal;
-                  const previousTool = field.currentTool;
-
-                  // Custom Logic for Tools based on Specific Validations
-                  if (nextVal) {
-                      // Logic when turning ON a status
-                      if (item.key === 'needsStoneRemoval') {
-                          // "Pierres" validated -> Switch to Sowing tool (Semoir or Planteuse)
-                          if (nextCrop) {
-                              const isPotato = toolAssignments["Planteuse a PDT"]?.includes(nextCrop);
-                              updates.currentTool = isPotato ? "Planteuse a PDT" : "Semoir";
-                          } else {
-                              updates.currentTool = "Semoir"; // Fallback
-                          }
-                      } else if (item.key === 'needsGrowing') {
-                          // When "En croissance" is checked, currentTool should be the harvester
-                          if ([CropType.OAT, CropType.CANOLA, CropType.BARLEY, CropType.WHEAT].includes(field.crop)) updates.currentTool = "JD X9 grande barre de coupe";
-                          else if ([CropType.CORN, CropType.SUNFLOWER].includes(field.crop)) updates.currentTool = "JD X9 barre maïs tournesol";
-                          else if (field.crop === CropType.POTATO) updates.currentTool = "Ventor";
-                          else if (field.crop === CropType.SUGARBEET) updates.currentTool = "Rexor";
-                          else if (field.crop === CropType.GRASS) updates.currentTool = "Faucheuse";
-                          else updates.currentTool = "Aucun";
-                      } else {
-                          // Standard behavior for other tools (Chaux -> Lisier -> Broyer -> etc.)
-                          if (TOOLS_LIST[index + 2]) {
-                              updates.currentTool = TOOLS_LIST[index + 2];
-                          }
-                      }
-                  }
-
-                  // Special logic for 'needsSowing' when turning it ON
-                  if (item.key === 'needsSowing' && !field.needsSowing) {
-                      // 1. Calculate the Harvest Month of the *current* crop (before we change it) to set as the new Sown Month.
-                      const currentSown = field.sownIn ?? 0;
-                      const growthTime = growthTimes[field.crop] || 5;
-                      const newSownIndex = (currentSown + growthTime) % 12;
-
-                      // 2. Determine the NEXT crop from the rotation list
-                      const currentCropIndex = ROTATION_ORDER.indexOf(field.crop);
-                      const nextCropCycle = ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length];
-                      
-                      // 3. Find harvester for the crop we just sowed/started growing (nextCropCycle is what is now growing)
-                      let harvester = 'Aucun';
-                      for (const tool of HARVESTERS) {
-                        if (toolAssignments[tool]?.includes(nextCropCycle)) {
-                            harvester = tool;
-                            break;
-                        }
-                      }
-
-                      onUpdate({
-                          ...updates,
-                          needsSowing: true,
-                          crop: nextCropCycle,
-                          sownIn: newSownIndex,
-                          currentTool: 'Aucun',
-                          lastCompletedTool: previousTool // Archive the planter/seeder
-                      });
-                  } else {
-                      // Archive tool if it changes
-                      if (updates.currentTool && updates.currentTool !== previousTool) {
-                          updates.lastCompletedTool = previousTool;
-                      }
-                      onUpdate(updates);
-                  }
-              };
-
-              return (
-                <BadgeButton 
-                  key={item.key}
-                  active={isChecked} 
-                  label={item.key === 'needsGrowing' && field.sownIn !== undefined ? (
-                    <div className="flex flex-col items-center">
-                      <span>{item.label}</span>
-                      <span className="text-[8px] opacity-80">
-                        ({Math.min((currentMonth - field.sownIn + 12) % 12, growthTimes[field.crop] || 0)}/{(growthTimes[field.crop] || 0)})
-                      </span>
-                    </div>
-                  ) : item.label} 
-                  onClick={handleClick} 
-                  color={item.color} 
-                  disabled={isDisabled}
-                />
-              );
-            })}
             
             <button
-                onClick={handleHarvest}
-                disabled={!allStatesValidated}
-                className={`w-full px-3 py-2 rounded-lg text-[10px] font-bold uppercase transition-all border flex justify-between items-center ${
-                    allStatesValidated
-                    ? 'bg-amber-500 text-slate-950 border-transparent shadow-lg shadow-amber-500/30 hover:bg-amber-400 cursor-pointer'
+                onClick={handleNextState}
+                disabled={field.needsGrowing}
+                className={`w-full px-3 py-3 rounded-xl text-xs font-bold uppercase transition-all border flex justify-center items-center gap-2 mb-4 ${
+                    !field.needsGrowing
+                    ? 'bg-emerald-500 text-slate-950 border-transparent shadow-lg shadow-emerald-500/30 hover:bg-emerald-400 cursor-pointer'
                     : 'bg-slate-800 text-slate-600 border-slate-700 opacity-50 cursor-not-allowed'
                 }`}
             >
-                <span>Récolter</span>
-                <span className={allStatesValidated ? 'animate-pulse' : ''}>{allStatesValidated ? '!' : '✗'}</span>
+                <Icons.Tractor />
+                <span>Changer d'état</span>
             </button>
+
+            <div className="space-y-3">
+                <div className="space-y-1">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">Etat actuel</p>
+                    <div className="w-full bg-slate-800/50 text-xs border border-slate-700/50 rounded-lg p-2 text-emerald-400 font-bold">
+                        {currentStatusLabel}
+                    </div>
+                </div>
+
+                {nextStatusLabel && (
+                    <div className="space-y-1">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">Etat en cours</p>
+                        <div className="w-full bg-slate-800/50 text-xs border border-slate-700/50 rounded-lg p-2 text-slate-400 font-bold">
+                            {nextStatusLabel}
+                        </div>
+                    </div>
+                )}
+            </div>
+            
+            {field.needsGrowing && (
+                <button
+                    onClick={handleHarvest}
+                    disabled={!allStatesValidated}
+                    className={`w-full mt-4 px-3 py-3 rounded-xl text-xs font-bold uppercase transition-all border flex justify-between items-center ${
+                        allStatesValidated
+                        ? 'bg-amber-500 text-slate-950 border-transparent shadow-lg shadow-amber-500/30 hover:bg-amber-400 cursor-pointer'
+                        : 'bg-slate-800 text-slate-600 border-slate-700 opacity-50 cursor-not-allowed'
+                    }`}
+                >
+                    <span>Récolter</span>
+                    <span className={allStatesValidated ? 'animate-pulse' : ''}>{allStatesValidated ? '!' : '✗'}</span>
+                </button>
+            )}
         </div>
       </div>
     </div>
