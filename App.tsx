@@ -559,6 +559,14 @@ const App: React.FC = () => {
     }));
   };
 
+  const deleteAnimal = (id: string) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer cet enclos ?")) return;
+    setGameState(prev => ({
+      ...prev,
+      animals: prev.animals.filter(a => a.id !== id)
+    }));
+  };
+
   const vehicleList: { name: string; count: number }[] = [
     { name: "Andaineur", count: 1 },
     { name: "Benne", count: 4 },
@@ -827,6 +835,51 @@ const App: React.FC = () => {
                     return (
                       <div className="text-center py-8 text-slate-500 italic text-sm">
                         Aucune action à faire ce mois-ci.
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <h3 className="text-lg font-bold text-white mb-4">Enclos a ravitailler</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const pensToRefill = (gameState.animals || []).filter(pen => {
+                    if (!pen.moisRavitaille || pen.anneeRavitaille === undefined || !pen.dureeRavitaillement) return false;
+                    const startMonthIndex = MONTHS.indexOf(pen.moisRavitaille);
+                    const totalMonths = startMonthIndex + pen.dureeRavitaillement;
+                    const endMonthIndex = totalMonths % 12;
+                    const additionalYears = Math.floor(totalMonths / 12);
+                    const endYear = pen.anneeRavitaille + additionalYears;
+                    
+                    return endMonthIndex === gameState.month && endYear === gameState.year;
+                  });
+
+                  if (pensToRefill.length > 0) {
+                    return pensToRefill.map(pen => (
+                      <div key={pen.id} className="flex items-center justify-between p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center text-amber-500">
+                            {pen.type === AnimalType.COWS && <Icons.Cow className="w-4 h-4" />}
+                            {pen.type === AnimalType.PIGS && <Icons.Pig className="w-4 h-4" />}
+                            {pen.type === AnimalType.CHICKENS && <Icons.Chicken className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">{pen.name || pen.type}</div>
+                            <div className="text-xs text-slate-400">Ravitaillement prévu ce mois-ci</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-amber-500 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 animate-pulse">
+                          RAVITAILLER
+                        </div>
+                      </div>
+                    ));
+                  } else {
+                    return (
+                      <div className="text-center py-8 text-slate-500 italic text-sm">
+                        Aucun enclos à ravitailler ce mois-ci.
                       </div>
                     );
                   }
@@ -1152,7 +1205,9 @@ const App: React.FC = () => {
                                         <AnimalCard 
                                             key={pen.id} 
                                             pen={pen} 
+                                            gameState={gameState}
                                             onUpdate={(updates) => updateAnimal(pen.id, updates)} 
+                                            onDelete={() => deleteAnimal(pen.id)}
                                             onOpenNotes={() => setActiveTab('notes')}
                                         />
                                     ))
@@ -2112,7 +2167,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
   );
 };
 
-const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalPen>) => void; onOpenNotes?: () => void }> = ({ pen, onUpdate, onOpenNotes }) => {
+const AnimalCard: React.FC<{ pen: AnimalPen; gameState: GameState; onUpdate: (updates: Partial<AnimalPen>) => void; onDelete?: () => void; onOpenNotes?: () => void }> = ({ pen, gameState, onUpdate, onDelete, onOpenNotes }) => {
   const isCow = pen.type === AnimalType.COWS;
   const isPig = pen.type === AnimalType.PIGS;
   const isChicken = pen.type === AnimalType.CHICKENS;
@@ -2194,7 +2249,9 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
               hay: 0,
               hydration: 0,
               concentrate: 0
-          }
+          },
+          moisRavitaille: MONTHS[gameState.month],
+          anneeRavitaille: gameState.year
        });
   };
 
@@ -2205,7 +2262,9 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
               foodProtein: 0,
               foodEnergy: 0,
               foodHydration: 0
-          }
+          },
+          moisRavitaille: MONTHS[gameState.month],
+          anneeRavitaille: gameState.year
        });
   };
 
@@ -2216,7 +2275,9 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
               energy: 0,
               base: 0,
               hydration: 0
-          }
+          },
+          moisRavitaille: MONTHS[gameState.month],
+          anneeRavitaille: gameState.year
        });
   };
 
@@ -2231,15 +2292,88 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
             {pen.type === AnimalType.SHEEP && <Icons.Cow />} {/* Fallback if needed */}
           </div>
           <div>
-            <h4 className="text-lg font-bold leading-tight">{pen.name || pen.type}</h4>
-            {isChicken && onOpenNotes && (
-                <button 
-                    onClick={onOpenNotes}
-                    className="mt-1 text-[10px] text-emerald-400 font-bold uppercase hover:text-emerald-300 transition-colors flex items-center gap-1"
-                >
-                    <Icons.Notes className="w-3 h-3" />
-                    <span>Notes</span>
-                </button>
+            <div className="flex items-center gap-4">
+              <h4 className="text-lg font-bold leading-tight">{pen.name || pen.type}</h4>
+              {(isCow || isPig || isChicken) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase whitespace-nowrap">Nourriture total</span>
+                  <input 
+                    type="number" 
+                    value={pen.totalFood || ''} 
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      const updates: Partial<AnimalPen> = { totalFood: val };
+                      if ((isCow || isPig || isChicken) && pen.consoAnnuelle) {
+                        updates.dureeRavitaillement = Math.round((val / pen.consoAnnuelle) * 12);
+                      }
+                      onUpdate(updates);
+                    }}
+                    className="w-24 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+              )}
+            </div>
+            {(isCow || isPig || isChicken) && (
+              <div className="flex items-center gap-4 mt-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">Conso quotidienne</span>
+                  <input 
+                    type="number" 
+                    value={pen.consoQuotidienne || ''} 
+                    placeholder="0"
+                    onChange={(e) => onUpdate({ consoQuotidienne: parseInt(e.target.value) || 0 })}
+                    className="w-20 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">Conso annuelle</span>
+                  <input 
+                    type="number" 
+                    value={pen.consoAnnuelle || ''} 
+                    placeholder="0"
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 0;
+                      const updates: Partial<AnimalPen> = { consoAnnuelle: val };
+                      if ((isCow || isPig || isChicken) && pen.totalFood) {
+                        updates.dureeRavitaillement = Math.round((pen.totalFood / val) * 12);
+                      }
+                      onUpdate(updates);
+                    }}
+                    className="w-20 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">Durée</span>
+                  <input 
+                    type="number" 
+                    value={pen.dureeRavitaillement || ''} 
+                    placeholder="0"
+                    onChange={(e) => onUpdate({ dureeRavitaillement: parseInt(e.target.value) || 0 })}
+                    className="w-16 bg-slate-800 border border-slate-700 rounded px-2 py-0.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">Mois ravitaillé</span>
+                  <div className="h-[26px] flex items-center px-2 bg-slate-800/50 border border-slate-700 rounded text-xs text-slate-300 font-mono">
+                    {pen.moisRavitaille ? `${pen.moisRavitaille} ${pen.anneeRavitaille}` : '-'}
+                  </div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-slate-500 font-bold uppercase">À ravitailler pour</span>
+                  <div className="h-[26px] flex items-center px-2 bg-slate-800/50 border border-slate-700 rounded text-xs text-blue-400 font-bold font-mono">
+                    {(() => {
+                      if (!pen.moisRavitaille || pen.anneeRavitaille === undefined || !pen.dureeRavitaillement) return '-';
+                      const startMonthIndex = MONTHS.indexOf(pen.moisRavitaille);
+                      const totalMonths = startMonthIndex + pen.dureeRavitaillement;
+                      const endMonthIndex = totalMonths % 12;
+                      const additionalYears = Math.floor(totalMonths / 12);
+                      const endYear = pen.anneeRavitaille + additionalYears;
+                      return `${MONTHS[endMonthIndex]} ${endYear}`;
+                    })()}
+                  </div>
+                </div>
+              </div>
             )}
             {(!isCow && !isPig && !isChicken) && (
                 <div className="flex items-center gap-2">
@@ -2254,12 +2388,23 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
             )}
           </div>
         </div>
-        {(!isCow && !isPig && !isChicken) && (
+        <div className="flex items-center gap-2">
+          {onDelete && (
+            <button 
+              onClick={onDelete}
+              className="p-2 bg-slate-800 hover:bg-rose-500/20 text-slate-400 hover:text-rose-500 rounded-xl transition-all"
+              title="Supprimer l'enclos"
+            >
+              <Icons.Trash className="w-4 h-4" />
+            </button>
+          )}
+          {(!isCow && !isPig && !isChicken) && (
             <div className="text-right">
               <p className="text-[10px] text-slate-500 font-bold uppercase">Santé</p>
               <p className="text-lg font-bold text-emerald-400 font-mono">{pen.health}%</p>
             </div>
-        )}
+          )}
+        </div>
       </div>
 
       {isCow ? (

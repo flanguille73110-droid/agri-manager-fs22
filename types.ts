@@ -85,6 +85,12 @@ export interface AnimalPen {
       base: number;    // Aliments de base 35%
       hydration: number; // Aliments hydratant 20%
   };
+  consoQuotidienne?: number;
+  consoAnnuelle?: number;
+  dureeRavitaillement?: number;
+  moisRavitaille?: string;
+  anneeRavitaille?: number;
+  totalFood?: number;
 }
 
 export interface Shortcut {
