@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Field, AnimalPen, GameState, CropType, FieldStatus, AnimalType, Shortcut } from './types';
+import { Field, AnimalPen, GameState, CropType, FieldStatus, AnimalType, Shortcut, Note } from './types';
 import { Icons, MONTHS } from './constants';
 
 const GROWTH_TIMES: Record<string, number> = {
@@ -140,8 +140,8 @@ const CHICKEN_CAPACITIES = {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'dashboard' | 'fields' | 'animals' | 'shortcuts' | 'settings'>('home');
-  const [activeSettingsTab, setActiveSettingsTab] = useState<'rotations' | 'tools' | 'vehicles'>('rotations');
+  const [activeTab, setActiveTab] = useState<'home' | 'dashboard' | 'fields' | 'animals' | 'shortcuts' | 'settings' | 'notes'>('home');
+  const [activeSettingsTab, setActiveSettingsTab] = useState<'rotations' | 'tools' | 'vehicles' | 'actions'>('rotations');
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   
   // Animal Selection State
@@ -149,7 +149,23 @@ const App: React.FC = () => {
 
   // Shortcut Modal State
   const [isShortcutModalOpen, setIsShortcutModalOpen] = useState(false);
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
+  const [newActionName, setNewActionName] = useState("");
   const [editingId, setEditingId] = useState<{ category: string; index: number } | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [noteSort, setNoteSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({
+    key: 'mois',
+    direction: 'asc'
+  });
+
+  const handleSort = (key: string) => {
+    setNoteSort(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   const [shortcutForm, setShortcutForm] = useState({
     category: 'CP COURSEPLAY',
     action: '',
@@ -157,7 +173,6 @@ const App: React.FC = () => {
     mouse: '',
     gamepad: ''
   });
-
   const [gameState, setGameState] = useState<GameState>(() => {
     const saved = localStorage.getItem('fs22_manager_state');
     if (saved) {
@@ -174,6 +189,18 @@ const App: React.FC = () => {
         // Migration for growthTimes
         if (!parsed.growthTimes || Object.keys(parsed.growthTimes).length === 0) {
             parsed.growthTimes = GROWTH_TIMES;
+        }
+        // Migration for notes
+        if (parsed.notes === undefined) {
+            parsed.notes = "";
+        }
+        // Migration for customActions
+        if (!parsed.customActions) {
+            parsed.customActions = [];
+        }
+        // Migration for structuredNotes
+        if (!parsed.structuredNotes) {
+            parsed.structuredNotes = [];
         }
         return parsed;
       } catch (e) {
@@ -194,13 +221,103 @@ const App: React.FC = () => {
       ],
       toolAssignments: DEFAULT_TOOL_ASSIGNMENTS,
       shortcuts: DEFAULT_SHORTCUTS,
-      growthTimes: GROWTH_TIMES
+      growthTimes: GROWTH_TIMES,
+      notes: "",
+      customActions: [],
+      structuredNotes: []
     };
+  });
+
+  const [noteForm, setNoteForm] = useState({
+    action: gameState.customActions?.[0] || '',
+    enclos: 'Moutons',
+    mois: MONTHS[gameState.month] || MONTHS[0],
+    annee: gameState.year,
+    duree: 0
   });
 
   useEffect(() => {
     localStorage.setItem('fs22_manager_state', JSON.stringify(gameState));
   }, [gameState]);
+
+  const handleSaveAction = () => {
+    if (newActionName.trim()) {
+      setGameState(prev => ({
+        ...prev,
+        customActions: [...(prev.customActions || []), newActionName.trim()]
+      }));
+      setNewActionName("");
+      setIsActionModalOpen(false);
+    }
+  };
+
+  const handleSaveNote = () => {
+    if (editingNoteId) {
+      setGameState(prev => ({
+        ...prev,
+        structuredNotes: (prev.structuredNotes || []).map(n => 
+          n.id === editingNoteId ? { ...noteForm, id: editingNoteId } : n
+        )
+      }));
+    } else {
+      const newNote: Note = {
+        id: Math.random().toString(36).substr(2, 9),
+        ...noteForm
+      };
+      setGameState(prev => ({
+        ...prev,
+        structuredNotes: [...(prev.structuredNotes || []), newNote]
+      }));
+    }
+    setIsNoteModalOpen(false);
+    setEditingNoteId(null);
+    setNoteForm({
+      action: gameState.customActions?.[0] || '',
+      enclos: 'Moutons',
+      mois: MONTHS[gameState.month] || MONTHS[0],
+      annee: gameState.year,
+      duree: 0
+    });
+  };
+
+  const openEditNoteModal = (note: Note) => {
+    setNoteForm({
+      action: note.action,
+      enclos: note.enclos,
+      mois: note.mois,
+      annee: note.annee,
+      duree: note.duree
+    });
+    setEditingNoteId(note.id);
+    setIsNoteModalOpen(true);
+  };
+
+  const updateNoteToCurrent = (id: string) => {
+    setGameState(prev => ({
+      ...prev,
+      structuredNotes: (prev.structuredNotes || []).map(n => 
+        n.id === id ? { 
+          ...n, 
+          mois: MONTHS[prev.month] || MONTHS[0], 
+          annee: prev.year 
+        } : n
+      )
+    }));
+  };
+
+  const deleteNote = (id: string) => {
+    setGameState(prev => ({
+      ...prev,
+      structuredNotes: (prev.structuredNotes || []).filter(n => n.id !== id)
+    }));
+  };
+
+  const deleteAction = (index: number) => {
+    setGameState(prev => ({
+      ...prev,
+      customActions: (prev.customActions || []).filter((_, i) => i !== index)
+    }));
+  };
 
   const updateGrowthTime = (crop: string, months: number) => {
     setGameState(prev => ({
@@ -499,7 +616,7 @@ const App: React.FC = () => {
           </div>
           <div>
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Mois en cours</div>
-            <div className="text-sm font-bold text-white">{MONTHS[gameState.month]}</div>
+            <div className="text-sm font-bold text-white">{MONTHS[gameState.month]} {gameState.year}</div>
           </div>
         </div>
         
@@ -518,7 +635,7 @@ const App: React.FC = () => {
         <div className="w-6 h-6 bg-emerald-500/20 rounded flex items-center justify-center text-emerald-400">
           <Icons.Calendar />
         </div>
-        <span className="text-xs font-bold text-white uppercase tracking-wider">{MONTHS[gameState.month]}</span>
+        <span className="text-xs font-bold text-white uppercase tracking-wider">{MONTHS[gameState.month]} {gameState.year}</span>
       </div>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 z-50">
         <MobileNavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedFieldId(null); }} icon={<Icons.Home />} label="Accueil" />
@@ -563,6 +680,30 @@ const App: React.FC = () => {
                       >
                         <Icons.ChevronRight />
                       </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-bold text-slate-400 uppercase tracking-wider">Année de jeu</label>
+                  <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400">
+                        <span className="font-bold text-lg">Y</span>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-white">Année {gameState.year}</div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={gameState.year}
+                        onChange={(e) => setGameState(prev => ({ ...prev, year: parseInt(e.target.value) || 1 }))}
+                        className="w-20 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-emerald-400 font-bold font-mono focus:outline-none focus:border-emerald-500"
+                      />
                     </div>
                   </div>
                 </div>
@@ -648,6 +789,48 @@ const App: React.FC = () => {
                     Aucun champ à récolter le mois prochain.
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <h3 className="text-lg font-bold text-white mb-4">Action a faire</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const actionsToDo = (gameState.structuredNotes || []).filter(note => {
+                    const startMonthIndex = MONTHS.indexOf(note.mois);
+                    const totalMonths = startMonthIndex + note.duree;
+                    const endMonthIndex = totalMonths % 12;
+                    const additionalYears = Math.floor(totalMonths / 12);
+                    const endYear = note.annee + additionalYears;
+                    
+                    return endMonthIndex === gameState.month && endYear === gameState.year;
+                  });
+
+                  if (actionsToDo.length > 0) {
+                    return actionsToDo.map(note => (
+                      <div key={note.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400">
+                            <Icons.Calendar className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-white">{note.action}</div>
+                            <div className="text-xs text-slate-400">{note.enclos}</div>
+                          </div>
+                        </div>
+                        <div className="text-xs font-bold text-blue-400 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                          À faire
+                        </div>
+                      </div>
+                    ));
+                  } else {
+                    return (
+                      <div className="text-center py-8 text-slate-500 italic text-sm">
+                        Aucune action à faire ce mois-ci.
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
           </div>
@@ -914,9 +1097,19 @@ const App: React.FC = () => {
                         className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 p-6 rounded-2xl flex items-center gap-6 transition-all group hover:border-amber-500/50 hover:shadow-[0_0_20px_rgba(245,158,11,0.1)]"
                     >
                         <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-amber-400 group-hover:scale-110 transition-transform">
-                             <Icons.Chicken />
+                            <Icons.Chicken />
                         </div>
                         <span className="text-xl font-bold text-slate-200">Poules</span>
+                    </button>
+
+                    <button 
+                        onClick={() => setActiveTab('notes')}
+                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 p-6 rounded-2xl flex items-center gap-6 transition-all group hover:border-blue-500/50 hover:shadow-[0_0_20px_rgba(59,130,246,0.1)]"
+                    >
+                        <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                            <Icons.Notes />
+                        </div>
+                        <span className="text-xl font-bold text-slate-200">Notes</span>
                     </button>
                 </div>
             ) : (
@@ -960,6 +1153,7 @@ const App: React.FC = () => {
                                             key={pen.id} 
                                             pen={pen} 
                                             onUpdate={(updates) => updateAnimal(pen.id, updates)} 
+                                            onOpenNotes={() => setActiveTab('notes')}
                                         />
                                     ))
                             ) : (
@@ -976,6 +1170,167 @@ const App: React.FC = () => {
                     </div>
                 </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'notes' && (
+          <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => setActiveTab('animals')}
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-slate-400 hover:text-white transition-all"
+                    >
+                        <Icons.ChevronLeft />
+                    </button>
+                    <h2 className="text-2xl font-bold text-white">Notes</h2>
+                </div>
+                <button 
+                    onClick={() => {
+                        setNoteForm({
+                            action: gameState.customActions?.[0] || '',
+                            enclos: 'Moutons',
+                            mois: MONTHS[gameState.month] || MONTHS[0],
+                            annee: gameState.year,
+                            duree: 0
+                        });
+                        setIsNoteModalOpen(true);
+                    }}
+                    className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-2"
+                >
+                    <Icons.Plus />
+                    <span>Ajouter une note</span>
+                </button>
+            </div>
+            
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="bg-slate-800/50 border-b border-slate-700">
+                            <th 
+                                onClick={() => handleSort('action')}
+                                className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                    Actions
+                                    {noteSort.key === 'action' && (noteSort.direction === 'asc' ? <Icons.ChevronUp className="w-3 h-3" /> : <Icons.ChevronDown className="w-3 h-3" />)}
+                                </div>
+                            </th>
+                            <th 
+                                onClick={() => handleSort('enclos')}
+                                className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                    Enclos
+                                    {noteSort.key === 'enclos' && (noteSort.direction === 'asc' ? <Icons.ChevronUp className="w-3 h-3" /> : <Icons.ChevronDown className="w-3 h-3" />)}
+                                </div>
+                            </th>
+                            <th 
+                                onClick={() => handleSort('mois')}
+                                className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                    Mois
+                                    {noteSort.key === 'mois' && (noteSort.direction === 'asc' ? <Icons.ChevronUp className="w-3 h-3" /> : <Icons.ChevronDown className="w-3 h-3" />)}
+                                </div>
+                            </th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Années de jeu</th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Durée</th>
+                            <th 
+                                onClick={() => handleSort('arefaire')}
+                                className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-white transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                    A refaire
+                                    {noteSort.key === 'arefaire' && (noteSort.direction === 'asc' ? <Icons.ChevronUp className="w-3 h-3" /> : <Icons.ChevronDown className="w-3 h-3" />)}
+                                </div>
+                            </th>
+                            <th className="p-4 text-xs font-bold text-slate-400 uppercase tracking-wider w-10"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                        {(() => {
+                            const sortedNotes = [...(gameState.structuredNotes || [])].sort((a, b) => {
+                                let valA: any;
+                                let valB: any;
+
+                                if (noteSort.key === 'action') {
+                                    valA = a.action.toLowerCase();
+                                    valB = b.action.toLowerCase();
+                                } else if (noteSort.key === 'enclos') {
+                                    valA = a.enclos.toLowerCase();
+                                    valB = b.enclos.toLowerCase();
+                                } else if (noteSort.key === 'mois') {
+                                    valA = MONTHS.indexOf(a.mois) + (a.annee * 12);
+                                    valB = MONTHS.indexOf(b.mois) + (b.annee * 12);
+                                } else if (noteSort.key === 'arefaire') {
+                                    valA = MONTHS.indexOf(a.mois) + a.duree + (a.annee * 12);
+                                    valB = MONTHS.indexOf(b.mois) + b.duree + (b.annee * 12);
+                                } else {
+                                    return 0;
+                                }
+
+                                if (valA < valB) return noteSort.direction === 'asc' ? -1 : 1;
+                                if (valA > valB) return noteSort.direction === 'asc' ? 1 : -1;
+                                return 0;
+                            });
+
+                            return sortedNotes.length > 0 ? (
+                                sortedNotes.map((note) => {
+                                    const startMonthIndex = MONTHS.indexOf(note.mois);
+                                    const totalMonths = startMonthIndex + note.duree;
+                                    const endMonthIndex = totalMonths % 12;
+                                    const additionalYears = Math.floor(totalMonths / 12);
+                                    const endYear = note.annee + additionalYears;
+                                    const endMonth = MONTHS[endMonthIndex];
+
+                                    return (
+                                        <tr key={note.id} className="hover:bg-slate-800/30 transition-colors group">
+                                            <td className="p-4 text-slate-200 font-medium">{note.action}</td>
+                                            <td className="p-4 text-slate-400">{note.enclos}</td>
+                                            <td className="p-4 text-slate-400">{note.mois}</td>
+                                            <td className="p-4 text-emerald-400 font-mono font-bold">{note.annee}</td>
+                                            <td className="p-4 text-slate-400">{note.duree}</td>
+                                            <td className="p-4 text-blue-400 font-bold">{endMonth} {endYear}</td>
+                                            <td className="p-4">
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button 
+                                                        onClick={() => updateNoteToCurrent(note.id)}
+                                                        className="text-slate-400 hover:text-blue-400 transition-colors p-1"
+                                                        title="Mettre au mois en cours"
+                                                    >
+                                                        <Icons.Calendar />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => openEditNoteModal(note)}
+                                                        className="text-slate-400 hover:text-emerald-400 transition-colors p-1"
+                                                        title="Modifier"
+                                                    >
+                                                        <Icons.Pencil />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => deleteNote(note.id)}
+                                                        className="text-slate-400 hover:text-red-400 transition-colors p-1"
+                                                        title="Supprimer"
+                                                    >
+                                                        <Icons.Trash />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="p-12 text-center text-slate-500 italic">
+                                        Aucune note enregistrée.
+                                    </td>
+                                </tr>
+                            );
+                        })()}
+                    </tbody>
+                </table>
+            </div>
           </div>
         )}
 
@@ -1139,7 +1494,7 @@ const App: React.FC = () => {
             <h2 className="text-2xl font-bold text-white mb-6">Paramètres</h2>
             
             <div className="flex p-1 bg-slate-900/80 border border-slate-800 rounded-xl overflow-x-auto">
-              {['rotations', 'tools', 'vehicles'].map((tab) => (
+              {['rotations', 'tools', 'vehicles', 'actions'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveSettingsTab(tab as any)}
@@ -1149,7 +1504,7 @@ const App: React.FC = () => {
                     : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  {tab === 'rotations' ? 'Rotations de cultures' : tab === 'tools' ? 'Outils' : 'Tous les véhicules'}
+                  {tab === 'rotations' ? 'Rotations de cultures' : tab === 'tools' ? 'Outils' : tab === 'vehicles' ? 'Tous les véhicules' : 'Actions'}
                 </button>
               ))}
             </div>
@@ -1222,6 +1577,181 @@ const App: React.FC = () => {
                    </div>
                 </div>
               )}
+              {activeSettingsTab === 'actions' && (
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="text-xl font-bold text-white">Actions</h3>
+                      <p className="text-slate-400 text-sm">Gérez vos actions personnalisées ici.</p>
+                    </div>
+                    <button 
+                      onClick={() => setIsActionModalOpen(true)}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 group"
+                    >
+                      <Icons.Plus className="group-hover:rotate-90 transition-transform" />
+                      <span>Ajouter une action</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    {(gameState.customActions || []).length > 0 ? (
+                      (gameState.customActions || []).map((action, index) => (
+                        <div key={index} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex justify-between items-center group">
+                          <span className="font-bold text-slate-200">{action}</span>
+                          <button 
+                            onClick={() => deleteAction(index)}
+                            className="text-slate-500 hover:text-red-400 transition-colors p-1 opacity-0 group-hover:opacity-100"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-12 text-slate-500 italic border-2 border-dashed border-slate-800 rounded-xl">
+                        Aucune action personnalisée.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        {/* Action Modal */}
+        {isActionModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-4">Ajouter une action</h3>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Nom de l'action</label>
+                  <input 
+                    type="text"
+                    value={newActionName}
+                    onChange={(e) => setNewActionName(e.target.value)}
+                    placeholder="Ex: Révision du tracteur"
+                    autoFocus
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none placeholder:text-slate-600"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveAction()}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => {
+                    setIsActionModalOpen(false);
+                    setNewActionName("");
+                  }}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={handleSaveAction}
+                  disabled={!newActionName.trim()}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Note Modal */}
+        {isNoteModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-4">
+                {editingNoteId ? 'Modifier la note' : 'Ajouter une note'}
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Action</label>
+                  <select 
+                    value={noteForm.action}
+                    onChange={(e) => setNoteForm({ ...noteForm, action: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  >
+                    <option value="" disabled>Sélectionner une action</option>
+                    {(gameState.customActions || []).map((action, idx) => (
+                      <option key={idx} value={action}>{action}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Enclos</label>
+                  <select 
+                    value={noteForm.enclos}
+                    onChange={(e) => setNoteForm({ ...noteForm, enclos: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  >
+                    <option value="Cochons">Cochons</option>
+                    <option value="Moutons">Moutons</option>
+                    <option value="Poules">Poules</option>
+                    <option value="Vaches">Vaches</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Mois</label>
+                  <select 
+                    value={noteForm.mois}
+                    onChange={(e) => setNoteForm({ ...noteForm, mois: e.target.value })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  >
+                    {MONTHS.map((month, idx) => (
+                      <option key={idx} value={month}>{month}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Années de jeu</label>
+                  <input 
+                    type="number"
+                    min="1"
+                    max="100"
+                    value={noteForm.annee}
+                    onChange={(e) => setNoteForm({ ...noteForm, annee: parseInt(e.target.value) || 1 })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Durée (mois)</label>
+                  <input 
+                    type="number"
+                    min="0"
+                    value={noteForm.duree}
+                    onChange={(e) => setNoteForm({ ...noteForm, duree: parseInt(e.target.value) || 0 })}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => {
+                    setIsNoteModalOpen(false);
+                    setEditingNoteId(null);
+                  }}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={handleSaveNote}
+                  disabled={!noteForm.action}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                >
+                  Valider
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1582,7 +2112,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
   );
 };
 
-const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalPen>) => void }> = ({ pen, onUpdate }) => {
+const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalPen>) => void; onOpenNotes?: () => void }> = ({ pen, onUpdate, onOpenNotes }) => {
   const isCow = pen.type === AnimalType.COWS;
   const isPig = pen.type === AnimalType.PIGS;
   const isChicken = pen.type === AnimalType.CHICKENS;
@@ -1702,6 +2232,15 @@ const AnimalCard: React.FC<{ pen: AnimalPen; onUpdate: (updates: Partial<AnimalP
           </div>
           <div>
             <h4 className="text-lg font-bold leading-tight">{pen.name || pen.type}</h4>
+            {isChicken && onOpenNotes && (
+                <button 
+                    onClick={onOpenNotes}
+                    className="mt-1 text-[10px] text-emerald-400 font-bold uppercase hover:text-emerald-300 transition-colors flex items-center gap-1"
+                >
+                    <Icons.Notes className="w-3 h-3" />
+                    <span>Notes</span>
+                </button>
+            )}
             {(!isCow && !isPig && !isChicken) && (
                 <div className="flex items-center gap-2">
                   <input 

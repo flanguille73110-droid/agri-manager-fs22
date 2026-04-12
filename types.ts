@@ -94,6 +94,15 @@ export interface Shortcut {
   gamepad?: string;
 }
 
+export interface Note {
+  id: string;
+  action: string;
+  enclos: string;
+  mois: string;
+  annee: number;
+  duree: number;
+}
+
 export interface GameState {
   money: number;
   month: number; // 1-12
@@ -103,4 +112,7 @@ export interface GameState {
   toolAssignments?: Record<string, CropType[]>;
   shortcuts?: Record<string, Shortcut[]>;
   growthTimes?: Record<string, number>;
+  notes?: string; // Keep for migration
+  structuredNotes?: Note[];
+  customActions?: string[];
 }
