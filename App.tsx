@@ -660,6 +660,53 @@ const App: React.FC = () => {
         {activeTab === 'home' && (
           <div className="max-w-4xl mx-auto space-y-6">
             <h2 className="text-2xl font-bold text-white mb-6">Accueil</h2>
+
+            {/* Badges de notification */}
+            {(() => {
+              const actionsCount = (gameState.structuredNotes || []).filter(note => {
+                const startMonthIndex = MONTHS.indexOf(note.mois);
+                const totalMonths = startMonthIndex + note.duree;
+                const endMonthIndex = totalMonths % 12;
+                const additionalYears = Math.floor(totalMonths / 12);
+                const endYear = note.annee + additionalYears;
+                return endMonthIndex === gameState.month && endYear === gameState.year;
+              }).length;
+
+              const refillCount = (gameState.animals || []).filter(pen => {
+                if (!pen.moisRavitaille || pen.anneeRavitaille === undefined || !pen.dureeRavitaillement) return false;
+                const startMonthIndex = MONTHS.indexOf(pen.moisRavitaille);
+                const totalMonths = startMonthIndex + pen.dureeRavitaillement;
+                const endMonthIndex = totalMonths % 12;
+                const additionalYears = Math.floor(totalMonths / 12);
+                const endYear = pen.anneeRavitaille + additionalYears;
+                return endMonthIndex === gameState.month && endYear === gameState.year;
+              }).length;
+
+              if (actionsCount > 0 || refillCount > 0) {
+                return (
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    {actionsCount > 0 && (
+                      <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 px-4 py-2 rounded-full shadow-lg shadow-blue-500/5 animate-fade-in">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                        <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+                          Action a faire : {actionsCount}
+                        </span>
+                      </div>
+                    )}
+                    {refillCount > 0 && (
+                      <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 px-4 py-2 rounded-full shadow-lg shadow-amber-500/5 animate-fade-in">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                        <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                          Enclos a ravitailler : {refillCount}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
               <div className="space-y-4">
                 <div className="flex flex-col gap-2">
