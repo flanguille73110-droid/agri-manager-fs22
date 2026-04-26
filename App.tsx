@@ -1305,8 +1305,8 @@ const App: React.FC = () => {
                 </button>
             </div>
             
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
-                <table className="w-full text-left border-collapse">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl shadow-xl overflow-x-auto">
+                <table className="w-full min-w-[600px] text-left border-collapse">
                     <thead>
                         <tr className="bg-slate-800/50 border-b border-slate-700">
                             <th 
@@ -2012,9 +2012,6 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
         }
 
         if (item.key === 'needsSowing') {
-            const currentSown = field.sownIn ?? 0;
-            const growthTime = growthTimes[field.crop] || 5;
-            const newSownIndex = (currentSown + growthTime) % 12;
             const currentCropIndex = ROTATION_ORDER.indexOf(field.crop);
             const nextCropCycle = ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length];
             
@@ -2022,7 +2019,7 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
                 ...updates,
                 needsSowing: true,
                 crop: nextCropCycle,
-                sownIn: newSownIndex,
+                sownIn: currentMonth,
                 currentTool: 'Aucun',
                 lastCompletedTool: previousTool
             });
