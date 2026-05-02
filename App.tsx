@@ -149,11 +149,18 @@ const App: React.FC = () => {
 
   // Shortcut Modal State
   const [isShortcutModalOpen, setIsShortcutModalOpen] = useState(false);
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+  const [isDeleteMenuConfirmOpen, setIsDeleteMenuConfirmOpen] = useState(false);
+  const [isEditMenuModalOpen, setIsEditMenuModalOpen] = useState(false);
+  const [menuToEdit, setMenuToEdit] = useState<string | null>(null);
+  const [menuToDelete, setMenuToDelete] = useState<string | null>(null);
+  const [newMenuName, setNewMenuName] = useState("");
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [newActionName, setNewActionName] = useState("");
   const [editingId, setEditingId] = useState<{ category: string; index: number } | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [noteSort, setNoteSort] = useState<{ key: string; direction: 'asc' | 'desc' }>({
     key: 'mois',
     direction: 'asc'
@@ -505,6 +512,68 @@ const App: React.FC = () => {
       setIsShortcutModalOpen(false);
   };
 
+  const handleUpdateMenuName = () => {
+      const trimmed = newMenuName.trim();
+      if (!trimmed || !menuToEdit) return;
+      if (trimmed === menuToEdit) {
+          setIsEditMenuModalOpen(false);
+          return;
+      }
+      if (gameState.shortcuts && gameState.shortcuts[trimmed]) {
+          alert("Ce menu existe déjà !");
+          return;
+      }
+      
+      setGameState(prev => {
+          const newShortcuts = { ...(prev.shortcuts || {}) };
+          newShortcuts[trimmed] = newShortcuts[menuToEdit];
+          delete newShortcuts[menuToEdit];
+          
+          // Mettre à jour expandedCategories si nécessaire
+          const newExpanded = { ...expandedCategories };
+          if (newExpanded[menuToEdit] !== undefined) {
+              newExpanded[trimmed] = newExpanded[menuToEdit];
+              delete newExpanded[menuToEdit];
+              setExpandedCategories(newExpanded);
+          }
+          
+          return { ...prev, shortcuts: newShortcuts };
+      });
+      
+      setNewMenuName("");
+      setMenuToEdit(null);
+      setIsEditMenuModalOpen(false);
+  };
+
+  const handleDeleteMenu = () => {
+      if (!menuToDelete) return;
+      setGameState(prev => {
+          const newShortcuts = { ...(prev.shortcuts || {}) };
+          delete newShortcuts[menuToDelete];
+          return { ...prev, shortcuts: newShortcuts };
+      });
+      setMenuToDelete(null);
+      setIsDeleteMenuConfirmOpen(false);
+  };
+
+  const handleAddMenu = () => {
+      const trimmed = newMenuName.trim();
+      if (!trimmed) return;
+      if (gameState.shortcuts && gameState.shortcuts[trimmed]) {
+          alert("Ce menu existe déjà !");
+          return;
+      }
+      setGameState(prev => ({
+          ...prev,
+          shortcuts: {
+              ...(prev.shortcuts || {}),
+              [trimmed]: []
+          }
+      }));
+      setNewMenuName("");
+      setIsMenuModalOpen(false);
+  };
+
   // Helper to get or create placeholder data for the detailed view by number
   const getFieldByNumber = (num: number): Field => {
     const existing = gameState.fields.find(f => f.number === num);
@@ -634,6 +703,7 @@ const App: React.FC = () => {
           <NavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
           <NavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Animaux" />
           <NavItem active={activeTab === 'shortcuts'} onClick={() => setActiveTab('shortcuts')} icon={<Icons.Zap />} label="Raccourcis" />
+          <NavItem active={activeTab === 'notes'} onClick={() => setActiveTab('notes')} icon={<Icons.Notes />} label="Notes" />
           <NavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Icons.Calendar />} label="Paramètres" />
         </div>
       </nav>
@@ -651,6 +721,7 @@ const App: React.FC = () => {
         <MobileNavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
         <MobileNavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Bêtes" />
         <MobileNavItem active={activeTab === 'shortcuts'} onClick={() => setActiveTab('shortcuts')} icon={<Icons.Zap />} label="Raccourcis" />
+        <MobileNavItem active={activeTab === 'notes'} onClick={() => setActiveTab('notes')} icon={<Icons.Notes />} label="Notes" />
         <MobileNavItem active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon={<Icons.Calendar />} label="Paramètres" />
       </nav>
 
@@ -1438,16 +1509,134 @@ const App: React.FC = () => {
 
         {activeTab === 'shortcuts' && (
           <div className="space-y-6 animate-fade-in relative">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h2 className="text-2xl font-bold text-white">Raccourcis</h2>
-                  <button 
-                      onClick={openAddShortcutModal}
-                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors shadow-lg shadow-emerald-500/20 flex items-center gap-2"
-                  >
-                      <Icons.Plus />
-                      <span>Ajouter une action</span>
-                  </button>
+                  <div className="flex flex-col gap-2 w-full sm:w-auto">
+                      <button 
+                          onClick={() => setIsMenuModalOpen(true)}
+                          className="bg-violet-600 hover:bg-violet-700 text-white font-bold py-2 px-4 rounded-xl transition-colors shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2"
+                      >
+                          <Icons.Plus />
+                          <span>Ajouter un menu</span>
+                      </button>
+                      <button 
+                          onClick={openAddShortcutModal}
+                          className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-colors shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
+                      >
+                          <Icons.Plus />
+                          <span>Ajouter une action</span>
+                      </button>
+                  </div>
               </div>
+
+              {/* Add Menu Modal */}
+              {isMenuModalOpen && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in">
+                          <h3 className="text-xl font-bold text-white mb-4">Ajouter un menu</h3>
+                          <div className="space-y-4">
+                              <div className="space-y-2">
+                                  <label className="text-xs text-slate-400 font-bold uppercase">Nom du menu</label>
+                                  <input 
+                                      type="text"
+                                      autoFocus
+                                      value={newMenuName}
+                                      onChange={(e) => setNewMenuName(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleAddMenu()}
+                                      placeholder="Ex: Commandes Tracteur"
+                                      className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-violet-500 outline-none placeholder:text-slate-600"
+                                  />
+                              </div>
+                              <div className="flex gap-3 mt-2">
+                                  <button 
+                                      onClick={() => {
+                                          setIsMenuModalOpen(false);
+                                          setNewMenuName("");
+                                      }}
+                                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                                  >
+                                      Annuler
+                                  </button>
+                                  <button 
+                                      onClick={handleAddMenu}
+                                      className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-violet-500/20"
+                                  >
+                                      Ajouter
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {/* Edit Menu Modal */}
+              {isEditMenuModalOpen && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in">
+                          <h3 className="text-xl font-bold text-white mb-4">Modifier le menu</h3>
+                          <div className="space-y-4">
+                              <div className="space-y-2">
+                                  <label className="text-xs text-slate-400 font-bold uppercase">Nouveau nom du menu</label>
+                                  <input 
+                                      type="text"
+                                      autoFocus
+                                      value={newMenuName}
+                                      onChange={(e) => setNewMenuName(e.target.value)}
+                                      onKeyDown={(e) => e.key === 'Enter' && handleUpdateMenuName()}
+                                      className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                                  />
+                              </div>
+                              <div className="flex gap-3 mt-2">
+                                  <button 
+                                      onClick={() => {
+                                          setIsEditMenuModalOpen(false);
+                                          setNewMenuName("");
+                                          setMenuToEdit(null);
+                                      }}
+                                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                                  >
+                                      Annuler
+                                  </button>
+                                  <button 
+                                      onClick={handleUpdateMenuName}
+                                      className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                                  >
+                                      Enregistrer
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {/* Delete Menu Confirmation Modal */}
+              {isDeleteMenuConfirmOpen && (
+                  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                      <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in">
+                          <h3 className="text-xl font-bold text-white mb-2">Supprimer le menu ?</h3>
+                          <p className="text-slate-400 text-sm mb-6">
+                              Êtes-vous sûr de vouloir supprimer le menu <span className="text-emerald-400 font-bold">"{menuToDelete}"</span> ? Tous les raccourcis qu'il contient seront définitivement effacés.
+                          </p>
+                          <div className="flex gap-3">
+                              <button 
+                                  onClick={() => {
+                                      setIsDeleteMenuConfirmOpen(false);
+                                      setMenuToDelete(null);
+                                  }}
+                                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                              >
+                                  Annuler
+                              </button>
+                              <button 
+                                  onClick={handleDeleteMenu}
+                                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
+                              >
+                                  Supprimer
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              )}
 
               {/* Add/Edit Shortcut Modal */}
               {isShortcutModalOpen && (
@@ -1465,7 +1654,7 @@ const App: React.FC = () => {
                                       onChange={(e) => setShortcutForm(prev => ({ ...prev, category: e.target.value }))}
                                       className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
                                   >
-                                      {Object.keys(gameState.shortcuts || {}).map(key => (
+                                      {Object.keys(gameState.shortcuts || {}).sort().map(key => (
                                           <option key={key} value={key}>{key}</option>
                                       ))}
                                   </select>
@@ -1535,59 +1724,127 @@ const App: React.FC = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {(Object.entries(gameState.shortcuts || {}) as [string, Shortcut[]][]).map(([category, shortcuts]) => (
-                      <div key={category} className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl hover:border-emerald-500/30 transition-colors shadow-lg flex flex-col group/card">
-                          <h3 className="text-xl font-bold text-emerald-400 mb-4 flex items-center gap-2 border-b border-slate-800 pb-2">
-                              {category}
-                          </h3>
-                          <div className="space-y-3">
-                              {shortcuts.map((shortcut, idx) => (
-                                  <div key={idx} className="flex flex-col gap-1 pb-2 border-b border-slate-800/50 last:border-0 last:pb-0 relative group">
-                                      <div className="flex justify-between items-start">
-                                        <span className="text-slate-300 font-medium text-sm">{shortcut.action}</span>
-                                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={() => openEditShortcutModal(category, idx, shortcut)} 
-                                                className="text-slate-400 hover:text-emerald-400 transition-colors p-1"
-                                                title="Modifier"
-                                            >
-                                                <Icons.Pencil />
-                                            </button>
-                                            <button 
-                                                onClick={() => handleDeleteShortcut(category, idx)} 
-                                                className="text-slate-400 hover:text-red-400 transition-colors p-1"
-                                                title="Supprimer"
-                                            >
-                                                <Icons.Trash />
-                                            </button>
+                  {(Object.entries(gameState.shortcuts || {}) as [string, Shortcut[]][]).sort((a, b) => a[0].localeCompare(b[0])).map(([category, shortcuts]) => {
+                      const isExpanded = expandedCategories[category] || false;
+                      return (
+                        <div key={category} className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl hover:border-emerald-500/30 transition-colors shadow-lg flex flex-col group/card">
+                            <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+                                <div className="flex items-center gap-2 group/title">
+                                    <h3 className="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                                        {category}
+                                    </h3>
+                                    <div className="flex gap-1 opacity-0 group-hover/title:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={() => {
+                                                setMenuToEdit(category);
+                                                setNewMenuName(category);
+                                                setIsEditMenuModalOpen(true);
+                                            }}
+                                            className="p-1 text-slate-500 hover:text-emerald-400 transition-colors"
+                                            title="Modifier le titre"
+                                        >
+                                            <Icons.Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setMenuToDelete(category);
+                                                setIsDeleteMenuConfirmOpen(true);
+                                            }}
+                                            className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                                            title="Supprimer le menu"
+                                        >
+                                            <Icons.Trash className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setExpandedCategories(prev => ({ ...prev, [category]: !isExpanded }))}
+                                    className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-2 text-xs font-semibold"
+                                    title={isExpanded ? "Cacher les actions" : "Voir les actions"}
+                                >
+                                    <span className="hidden sm:inline">{isExpanded ? 'Masquer' : 'Afficher'}</span>
+                                    {isExpanded ? <Icons.ChevronUp className="w-4 h-4" /> : <Icons.ChevronDown className="w-4 h-4" />}
+                                </button>
+                            </div>
+                            
+                            {isExpanded && (
+                                <div className="space-y-3 animate-fade-in">
+                                    {shortcuts.map((shortcut, idx) => (
+                                        <div key={idx} className="flex flex-col gap-1 pb-2 border-b border-slate-800/50 last:border-0 last:pb-0 relative group">
+                                            <div className="flex justify-between items-start">
+                                            <span className="text-slate-300 font-medium text-sm">{shortcut.action}</span>
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button 
+                                                    onClick={() => openEditShortcutModal(category, idx, shortcut)} 
+                                                    className="text-slate-400 hover:text-emerald-400 transition-colors p-1"
+                                                    title="Modifier"
+                                                >
+                                                    <Icons.Pencil />
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleDeleteShortcut(category, idx)} 
+                                                    className="text-slate-400 hover:text-red-400 transition-colors p-1"
+                                                    title="Supprimer"
+                                                >
+                                                    <Icons.Trash />
+                                                </button>
+                                            </div>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {shortcut.keyboard && (
+                                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
+                                                        ⌨ {shortcut.keyboard}
+                                                    </span>
+                                                )}
+                                                {shortcut.mouse && (
+                                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
+                                                        🖱️ {shortcut.mouse}
+                                                    </span>
+                                                )}
+                                                {shortcut.gamepad && (
+                                                    <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
+                                                        🎮 {shortcut.gamepad}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
-                                      </div>
-                                      <div className="flex flex-wrap gap-2">
-                                          {shortcut.keyboard && (
-                                              <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
-                                                  ⌨ {shortcut.keyboard}
-                                              </span>
-                                          )}
-                                          {shortcut.mouse && (
-                                              <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
-                                                  🖱️ {shortcut.mouse}
-                                              </span>
-                                          )}
-                                          {shortcut.gamepad && (
-                                              <span className="bg-slate-800 text-slate-400 text-xs px-2 py-1 rounded border border-slate-700 font-mono">
-                                                  🎮 {shortcut.gamepad}
-                                              </span>
-                                          )}
-                                      </div>
-                                  </div>
-                              ))}
-                              {shortcuts.length === 0 && (
-                                <div className="text-slate-500 text-xs italic text-center py-4">Aucun raccourci</div>
-                              )}
-                          </div>
-                      </div>
-                  ))}
+                                    ))}
+                                    {shortcuts.length === 0 && (
+                                        <div className="text-slate-500 text-xs italic text-center py-4">Aucun raccourci</div>
+                                    )}
+                                </div>
+                            )}
+                            {!isExpanded && (
+                                <div className="flex flex-col items-center justify-center py-4 text-slate-500">
+                                    <Icons.Zap className="w-8 h-8 mb-2 opacity-20" />
+                                    <p className="text-xs italic">{shortcuts.length} action{shortcuts.length > 1 ? 's' : ''} masquée{shortcuts.length > 1 ? 's' : ''}</p>
+                                </div>
+                            )}
+                        </div>
+                      );
+                  })}
               </div>
+          </div>
+        )}
+
+        {activeTab === 'notes' && (
+          <div className="space-y-6 animate-fade-in relative">
+            <h2 className="text-2xl font-bold text-white mb-6">Notes</h2>
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-xl">
+              <div className="flex items-center gap-3 mb-4 text-emerald-400">
+                <Icons.Notes className="w-6 h-6" />
+                <h3 className="text-xl font-bold uppercase tracking-wider">Mes Notes</h3>
+              </div>
+              <textarea
+                value={gameState.notes || ""}
+                onChange={(e) => setGameState(prev => ({ ...prev, notes: e.target.value }))}
+                placeholder="Écrivez vos notes ici..."
+                className="w-full h-[60vh] bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-slate-200 focus:border-emerald-500 outline-none resize-none placeholder:text-slate-600 font-medium leading-relaxed"
+              />
+              <div className="mt-4 flex justify-end">
+                <span className="text-xs text-slate-500 italic">Sauvegarde automatique activée</span>
+              </div>
+            </div>
           </div>
         )}
 
