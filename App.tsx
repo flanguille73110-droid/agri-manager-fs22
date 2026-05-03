@@ -854,19 +854,26 @@ const App: React.FC = () => {
                     })
                     .sort((a, b) => a.number - b.number)
                     .map(field => (
-                      <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                      <button 
+                        key={field.id} 
+                        onClick={() => {
+                          setActiveTab('fields');
+                          setSelectedFieldId(field.number);
+                        }}
+                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-emerald-500/50 transition-all group"
+                      >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-emerald-500 transition-colors">
                             {field.number}
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-white">{field.crop}</div>
+                            <div className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">{field.crop}</div>
                           </div>
                         </div>
-                        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
                           À récolter
                         </div>
-                      </div>
+                      </button>
                     ))
                 ) : (
                   <div className="text-center py-8 text-slate-500 italic text-sm">
@@ -896,19 +903,26 @@ const App: React.FC = () => {
                     })
                     .sort((a, b) => a.number - b.number)
                     .map(field => (
-                      <div key={field.id} className="flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                      <button 
+                        key={field.id} 
+                        onClick={() => {
+                          setActiveTab('fields');
+                          setSelectedFieldId(field.number);
+                        }}
+                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-amber-500/50 transition-all group"
+                      >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-amber-500 transition-colors">
                             {field.number}
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-white">{field.crop}</div>
+                            <div className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{field.crop}</div>
                           </div>
                         </div>
-                        <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                        <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
                           Mois prochain
                         </div>
-                      </div>
+                      </button>
                     ))
                 ) : (
                   <div className="text-center py-8 text-slate-500 italic text-sm">
@@ -1219,10 +1233,12 @@ const App: React.FC = () => {
                                         </div>
                                         {field && (
                                             <div className="pl-11">
-                                                <div className="text-xs text-slate-400 font-medium">{field.crop}</div>
+                                                {(field.needsGrowing || field.needsSowing || field.needsStoneRemoval || field.needsHarvest) && (
+                                                    <div className="text-xs text-slate-400 font-medium">{field.crop}</div>
+                                                )}
                                                 {field.currentTool !== 'Aucun' && (
-                                                    <div className="text-[10px] text-emerald-500/80 mt-1 truncate max-w-[120px]">
-                                                        {field.currentTool}
+                                                    <div className="text-xs text-emerald-500/90 mt-1 font-semibold">
+                                                        {field.currentTool} en cours
                                                     </div>
                                                 )}
                                             </div>
@@ -2344,41 +2360,45 @@ const FieldCard = ({ field, onUpdate, toolAssignments, currentMonth, growthTimes
         <div className="flex-1 space-y-4">
             <h4 className="text-lg font-bold">Champ #{field.number}</h4>
 
-            {/* Culture actuelle */}
-            <div className="space-y-1">
-                <p className={`text-[10px] font-bold uppercase ${highlightCurrent ? 'text-purple-400' : 'text-slate-500'}`}>Culture actuelle</p>
-                <select 
-                    value={field.crop} 
-                    onChange={(e) => onUpdate({ crop: e.target.value as CropType })}
-                    className={`w-full text-xs border rounded-lg p-2 transition-colors ${
-                        highlightCurrent 
-                        ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(192,132,252,0.1)]' 
-                        : 'bg-slate-800 border-slate-700 text-slate-400'
-                    }`}
-                >
-                    {ROTATION_ORDER.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-            </div>
-
-            {/* Sowing and Harvesting - Grid */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">Semé en</p>
-                    <select 
-                        value={field.sownIn ?? 0}
-                        onChange={(e) => onUpdate({ sownIn: parseInt(e.target.value) })}
-                        className="w-full bg-slate-800 text-xs border border-slate-700 rounded-lg p-2"
-                    >
-                        {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                    </select>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-[10px] text-slate-500 font-bold uppercase">À récolter en</p>
-                    <div className="w-full bg-slate-800/50 text-xs border border-slate-700/50 rounded-lg p-2 text-emerald-400 font-bold flex items-center">
-                        {calculateHarvestMonth(field.crop, field.sownIn)}
+            {/* Culture actuelle - Affichée uniquement à partir de l'état "À Semer" */}
+            {isPrepComplete && (
+                <>
+                    <div className="space-y-1 animate-fade-in text-emerald-400">
+                        <p className={`text-[10px] font-bold uppercase ${highlightCurrent ? 'text-purple-400' : 'text-slate-500'}`}>Culture actuelle</p>
+                        <select 
+                            value={field.crop} 
+                            onChange={(e) => onUpdate({ crop: e.target.value as CropType })}
+                            className={`w-full text-xs border rounded-lg p-2 transition-colors ${
+                                highlightCurrent 
+                                ? 'bg-purple-500/10 border-purple-500/50 text-purple-300 shadow-[0_0_15px_rgba(192,132,252,0.1)]' 
+                                : 'bg-slate-800 border-slate-700 text-slate-400'
+                            }`}
+                        >
+                            {ROTATION_ORDER.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
                     </div>
-                </div>
-            </div>
+
+                    {/* Sowing and Harvesting - Grid */}
+                    <div className="grid grid-cols-2 gap-3 animate-fade-in">
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">Semé en</p>
+                            <select 
+                                value={field.sownIn ?? 0}
+                                onChange={(e) => onUpdate({ sownIn: parseInt(e.target.value) })}
+                                className="w-full bg-slate-800 text-xs border border-slate-700 rounded-lg p-2"
+                            >
+                                {MONTHS.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-[10px] text-slate-500 font-bold uppercase">À récolter en</p>
+                            <div className="w-full bg-slate-800/50 text-xs border border-slate-700/50 rounded-lg p-2 text-emerald-400 font-bold flex items-center">
+                                {calculateHarvestMonth(field.crop, field.sownIn)}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Next Crop */}
             <div className="space-y-1">
