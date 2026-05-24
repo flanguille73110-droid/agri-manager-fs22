@@ -140,7 +140,7 @@ const CHICKEN_CAPACITIES = {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'home' | 'dashboard' | 'fields' | 'animals' | 'shortcuts' | 'settings' | 'notes'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'fields' | 'animals' | 'shortcuts' | 'settings' | 'notes'>('home');
   const [activeSettingsTab, setActiveSettingsTab] = useState<'rotations' | 'tools' | 'vehicles' | 'actions'>('rotations');
   const [selectedFieldId, setSelectedFieldId] = useState<number | null>(null);
   
@@ -699,7 +699,6 @@ const App: React.FC = () => {
         
         <div className="space-y-2">
           <NavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedFieldId(null); }} icon={<Icons.Home />} label="Accueil" />
-          <NavItem active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Véhicules" />
           <NavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
           <NavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Animaux" />
           <NavItem active={activeTab === 'shortcuts'} onClick={() => setActiveTab('shortcuts')} icon={<Icons.Zap />} label="Raccourcis" />
@@ -717,7 +716,6 @@ const App: React.FC = () => {
       </div>
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex justify-around items-center px-2 z-50">
         <MobileNavItem active={activeTab === 'home'} onClick={() => { setActiveTab('home'); setSelectedFieldId(null); }} icon={<Icons.Home />} label="Accueil" />
-        <MobileNavItem active={activeTab === 'dashboard'} onClick={() => { setActiveTab('dashboard'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Véhicules" />
         <MobileNavItem active={activeTab === 'fields'} onClick={() => { setActiveTab('fields'); setSelectedFieldId(null); }} icon={<Icons.Tractor />} label="Champs" />
         <MobileNavItem active={activeTab === 'animals'} onClick={() => { setActiveTab('animals'); setSelectedAnimalType(null); }} icon={<Icons.Cow />} label="Bêtes" />
         <MobileNavItem active={activeTab === 'shortcuts'} onClick={() => setActiveTab('shortcuts')} icon={<Icons.Zap />} label="Raccourcis" />
@@ -1021,118 +1019,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeTab === 'dashboard' && (
-          <div className="space-y-6">
-            {selectedFieldId === null ? (
-                <div className="space-y-4">
-                    <h2 className="text-2xl font-bold mb-4">Sélectionnez un champ</h2>
-                    <div className="grid grid-cols-2 gap-3">
-                        {sortedFieldNumbers.map((num) => {
-                            const field = gameState.fields.find(f => f.number === num);
-                            const currentTool = field?.currentTool;
-                            const hasTool = currentTool && currentTool !== 'Aucun';
-
-                            return (
-                                <button
-                                    key={num}
-                                    onClick={() => setSelectedFieldId(num)}
-                                    className={`w-full bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex justify-between items-center transition-all group ${hasTool ? 'border-amber-500/30 bg-amber-900/10' : 'hover:bg-slate-800 hover:border-emerald-500/50'}`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 ${hasTool ? 'bg-amber-500/20 text-amber-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
-                                            <span className="font-bold">{num}</span>
-                                        </div>
-                                        <div className="flex flex-col items-start">
-                                            <span className="font-bold text-lg text-slate-200 group-hover:text-emerald-400 transition-colors">Champ n°{num}</span>
-                                            {hasTool && (
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className="relative flex h-2 w-2">
-                                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                                                    </span>
-                                                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wide">{currentTool}</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className={`transition-colors ${hasTool ? 'text-amber-500' : 'text-slate-600 group-hover:text-emerald-500'}`}>
-                                       <Icons.Tractor />
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-            ) : (
-                <div className="space-y-6 animate-fade-in">
-                    <button 
-                        onClick={() => setSelectedFieldId(null)}
-                        className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors font-medium mb-4"
-                    >
-                        <span>← Retour aux champs</span>
-                    </button>
-                    
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
-                            <span className="text-3xl font-bold">{selectedFieldId}</span>
-                        </div>
-                        <h2 className="text-3xl font-bold text-white">Champ n°{selectedFieldId}</h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* En travail (GAUCHE) */}
-                        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 min-h-[400px]">
-                            <h3 className="text-xl font-bold text-amber-400 mb-6 flex items-center gap-3">
-                                <span className="w-3 h-3 rounded-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]"></span>
-                                En travail
-                            </h3>
-                            <div className="space-y-3">
-                                {selectedField?.currentTool && selectedField.currentTool !== 'Aucun' ? (
-                                    <div className="bg-slate-800 border border-amber-500/30 rounded-xl p-6 flex flex-col items-center justify-center text-slate-300 gap-3 h-64 shadow-[0_0_20px_rgba(245,158,11,0.1)] animate-fade-in">
-                                        <div className="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 animate-pulse">
-                                            <Icons.Tractor />
-                                        </div>
-                                        <span className="font-bold text-lg text-center">{selectedField.currentTool}</span>
-                                        <span className="text-xs text-amber-500 font-bold uppercase tracking-wider bg-amber-500/10 px-3 py-1 rounded-full">En cours d'utilisation</span>
-                                    </div>
-                                ) : (
-                                    <div className="border-2 border-dashed border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 gap-2 h-64">
-                                        <Icons.Tractor />
-                                        <span>Aucune machine en cours</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                         {/* Finis en attente (DROITE) */}
-                        <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 min-h-[400px]">
-                            <h3 className="text-xl font-bold text-emerald-400 mb-6 flex items-center gap-3">
-                                <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></span>
-                                Finis en attente
-                            </h3>
-                            <div className="space-y-3">
-                                {selectedField?.lastCompletedTool ? (
-                                    <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 flex flex-col items-center justify-center text-slate-300 gap-3 h-64 animate-fade-in">
-                                        <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400">
-                                            <Icons.Tractor />
-                                        </div>
-                                        <span className="font-bold text-lg text-center">{selectedField.lastCompletedTool}</span>
-                                        <span className="text-xs text-emerald-500 font-bold uppercase tracking-wider bg-emerald-500/10 px-3 py-1 rounded-full">Tâche terminée</span>
-                                    </div>
-                                ) : (
-                                    <div className="border-2 border-dashed border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 gap-2 h-64">
-                                        <span className="text-2xl font-bold">✓</span>
-                                        <span>Aucune tâche terminée récemment</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'fields' && (
           <div className="space-y-6">
             {selectedFieldId ? (
@@ -1159,8 +1045,28 @@ const App: React.FC = () => {
                     
                     <div>
                         <div className="grid grid-cols-2 gap-4">
-                            {Array.from({length: 11}, (_, i) => i + 1).map(num => {
-                                const field = gameState.fields.find(f => f.number === num);
+                            {Array.from({length: 11}, (_, i) => i + 1)
+                                .sort((a, b) => {
+                                    const fieldA = gameState.fields.find(f => f.number === a);
+                                    const fieldB = gameState.fields.find(f => f.number === b);
+                                    
+                                    const isTopPriority = (f: any) => {
+                                        if (!f) return true; // Libre -> pas en croissance -> haut de page
+                                        if (!f.needsSowing) return true; // pas en croissance (ex: À Broyer, À Récolter, etc.) -> haut de page
+                                        const growth = (gameState.growthTimes?.[f.crop] || GROWTH_TIMES[f.crop]) || 0;
+                                        const progress = f.sownIn !== undefined ? Math.min((gameState.month - f.sownIn + 12) % 12, growth) : 0;
+                                        return growth > 0 && progress === growth; // croissance terminée -> haut de page
+                                    };
+
+                                    const topA = isTopPriority(fieldA);
+                                    const topB = isTopPriority(fieldB);
+
+                                    if (topA && !topB) return -1;
+                                    if (!topA && topB) return 1;
+                                    return a - b;
+                                })
+                                .map(num => {
+                                    const field = gameState.fields.find(f => f.number === num);
                                 
                                 let statusText = "Libre";
                                 let statusColor = "text-slate-500";
