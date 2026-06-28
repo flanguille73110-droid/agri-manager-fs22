@@ -841,14 +841,14 @@ const App: React.FC = () => {
                   if (field.sownIn === undefined) return false;
                   const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                   const harvestMonthIndex = (field.sownIn + growth) % 12;
-                  return harvestMonthIndex === gameState.month;
+                  return harvestMonthIndex === gameState.month && field.needsGrowing;
                 }).length > 0 ? (
                   gameState.fields
                     .filter(field => {
                       if (field.sownIn === undefined) return false;
                       const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
                       const harvestMonthIndex = (field.sownIn + growth) % 12;
-                      return harvestMonthIndex === gameState.month;
+                      return harvestMonthIndex === gameState.month && field.needsGrowing;
                     })
                     .sort((a, b) => a.number - b.number)
                     .map(field => (
@@ -925,6 +925,88 @@ const App: React.FC = () => {
                 ) : (
                   <div className="text-center py-8 text-slate-500 italic text-sm">
                     Aucun champ à récolter le mois prochain.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 p-6 rounded-2xl shadow-lg">
+              <h3 className="text-lg font-bold text-white mb-4">Champs en travail</h3>
+              <div className="space-y-3">
+                {gameState.fields.filter(field => field && !field.needsGrowing && !field.needsSowing).length > 0 ? (
+                  gameState.fields
+                    .filter(field => field && !field.needsGrowing && !field.needsSowing)
+                    .sort((a, b) => a.number - b.number)
+                    .map(field => {
+                      let statusText = "en attente";
+                      let statusColor = "text-slate-400 bg-slate-500/10 border-slate-500/20 group-hover:bg-slate-500/20";
+                      let cropText = field.crop;
+                      let hoverBorderColor = "hover:border-slate-500/50";
+
+                      if (field.needsStoneRemoval) {
+                        const currentCropIndex = ROTATION_ORDER.indexOf(field.crop);
+                        const nextCrop = currentCropIndex !== -1 
+                            ? ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length] 
+                            : field.crop;
+                        statusText = "À semer";
+                        statusColor = "text-blue-400 bg-blue-500/10 border-blue-500/20 group-hover:bg-blue-500/20";
+                        cropText = nextCrop;
+                        hoverBorderColor = "hover:border-blue-500/50";
+                      } else if (field.needsPlowing) {
+                        statusText = "Enlever les pierres";
+                        statusColor = "text-stone-400 bg-stone-500/10 border-stone-500/20 group-hover:bg-stone-500/20";
+                        hoverBorderColor = "hover:border-stone-500/50";
+                      } else if (field.needsMulching) {
+                        statusText = "À Labourer";
+                        statusColor = "text-orange-400 bg-orange-500/10 border-orange-500/20 group-hover:bg-orange-500/20";
+                        hoverBorderColor = "hover:border-orange-500/50";
+                      } else if (field.needsSlurry) {
+                        statusText = "À Broyer";
+                        statusColor = "text-rose-400 bg-rose-500/10 border-rose-500/20 group-hover:bg-rose-500/20";
+                        hoverBorderColor = "hover:border-rose-500/50";
+                      } else if (field.needsLime) {
+                        statusText = "À Amender en lisier";
+                        statusColor = "text-lime-400 bg-lime-500/10 border-lime-500/20 group-hover:bg-lime-500/20";
+                        hoverBorderColor = "hover:border-lime-500/50";
+                      } else if (field.isWaiting) {
+                        statusText = "À Chauler";
+                        statusColor = "text-cyan-400 bg-cyan-500/10 border-cyan-500/20 group-hover:bg-cyan-500/20";
+                        hoverBorderColor = "hover:border-cyan-500/50";
+                      }
+
+                      return (
+                        <button 
+                          key={field.id} 
+                          onClick={() => {
+                            setActiveTab('fields');
+                            setSelectedFieldId(field.number);
+                          }}
+                          className={`w-full flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl transition-all group ${hoverBorderColor} gap-3`}
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-sm font-bold text-white transition-colors">
+                            <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-slate-600 transition-colors shrink-0">
+                              {field.number}
+                            </div>
+                            <span className="text-slate-300">Champ {field.number}</span>
+                            <span className="text-slate-600">/</span>
+                            <span className="text-emerald-400 font-semibold">{field.currentTool || 'Aucun'}</span>
+                            {statusText === "À semer" && (
+                              <>
+                                <span className="text-slate-600">/</span>
+                                <span className="text-blue-400 font-bold">{cropText}</span>
+                              </>
+                            )}
+                            <span className="text-slate-600">/</span>
+                            <span className={`text-xs font-bold px-3 py-1 rounded-full border transition-colors ${statusColor}`}>
+                              {statusText}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })
+                ) : (
+                  <div className="text-center py-8 text-slate-500 italic text-sm">
+                    Aucun champ en travail actuellement.
                   </div>
                 )}
               </div>
@@ -1067,6 +1149,11 @@ const App: React.FC = () => {
                                 })
                                 .map(num => {
                                     const field = gameState.fields.find(f => f.number === num);
+                                    
+                                    const currentCropIndex = field ? ROTATION_ORDER.indexOf(field.crop) : -1;
+                                    const nextCrop = currentCropIndex !== -1 
+                                        ? ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length] 
+                                        : undefined;
                                 
                                 let statusText = "Libre";
                                 let statusColor = "text-slate-500";
@@ -1140,7 +1227,9 @@ const App: React.FC = () => {
                                         {field && (
                                             <div className="pl-11">
                                                 {(field.needsGrowing || field.needsSowing || field.needsStoneRemoval || field.needsHarvest) && (
-                                                    <div className="text-xs text-slate-400 font-medium">{field.crop}</div>
+                                                    <div className="text-xs text-slate-400 font-medium">
+                                                        {field.needsStoneRemoval && nextCrop ? nextCrop : field.crop}
+                                                    </div>
                                                 )}
                                                 {field.currentTool !== 'Aucun' && (
                                                     <div className="text-xs text-emerald-500/90 mt-1 font-semibold">
