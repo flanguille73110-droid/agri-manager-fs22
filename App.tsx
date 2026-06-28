@@ -987,7 +987,6 @@ const App: React.FC = () => {
                             <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-slate-600 transition-colors shrink-0">
                               {field.number}
                             </div>
-                            <span className="text-slate-300">Champ {field.number}</span>
                             <span className="text-slate-600">/</span>
                             <span className="text-emerald-400 font-semibold">{field.currentTool || 'Aucun'}</span>
                             {statusText === "À semer" && (
