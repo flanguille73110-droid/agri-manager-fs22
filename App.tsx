@@ -1227,7 +1227,7 @@ const App: React.FC = () => {
                                             <div className="pl-11">
                                                 {(field.needsGrowing || field.needsSowing || field.needsStoneRemoval || field.needsHarvest) && (
                                                     <div className="text-xs text-slate-400 font-medium">
-                                                        {field.needsStoneRemoval && nextCrop ? nextCrop : field.crop}
+                                                        {(field.needsStoneRemoval && !field.needsSowing) && nextCrop ? nextCrop : field.crop}
                                                     </div>
                                                 )}
                                                 {field.currentTool !== 'Aucun' && (
