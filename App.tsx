@@ -838,17 +838,23 @@ const App: React.FC = () => {
               <h3 className="text-lg font-bold text-white mb-4">Champs a récolter</h3>
               <div className="space-y-3">
                 {gameState.fields.filter(field => {
-                  if (field.sownIn === undefined) return false;
-                  const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
-                  const harvestMonthIndex = (field.sownIn + growth) % 12;
-                  return harvestMonthIndex === gameState.month && field.needsGrowing;
+                  if (field.needsGrowing) return true;
+                  if (field.needsSowing && field.sownIn !== undefined) {
+                    const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
+                    const progress = Math.min((gameState.month - field.sownIn + 12) % 12, growth);
+                    return growth > 0 && progress === growth;
+                  }
+                  return false;
                 }).length > 0 ? (
                   gameState.fields
                     .filter(field => {
-                      if (field.sownIn === undefined) return false;
-                      const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
-                      const harvestMonthIndex = (field.sownIn + growth) % 12;
-                      return harvestMonthIndex === gameState.month && field.needsGrowing;
+                      if (field.needsGrowing) return true;
+                      if (field.needsSowing && field.sownIn !== undefined) {
+                        const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 5;
+                        const progress = Math.min((gameState.month - field.sownIn + 12) % 12, growth);
+                        return growth > 0 && progress === growth;
+                      }
+                      return false;
                     })
                     .sort((a, b) => a.number - b.number)
                     .map(field => (
