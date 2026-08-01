@@ -385,6 +385,15 @@ const App: React.FC = () => {
     setGameState(prev => ({ ...prev, animals: [...prev.animals, newPen] }));
   };
 
+  const getHarvesterToolForCrop = (crop: CropType): string => {
+    if ([CropType.OAT, CropType.CANOLA, CropType.BARLEY, CropType.WHEAT].includes(crop)) return "JD X9 grande barre de coupe";
+    if ([CropType.CORN, CropType.SUNFLOWER].includes(crop)) return "JD X9 barre maïs tournesol";
+    if (crop === CropType.POTATO) return "Ventor";
+    if (crop === CropType.SUGARBEET) return "Rexor";
+    if (crop === CropType.GRASS) return "Faucheuse";
+    return "Aucun";
+  };
+
   const advanceMonth = () => {
     setGameState(prev => {
       let nextMonth = prev.month + 1;
@@ -393,7 +402,28 @@ const App: React.FC = () => {
         nextMonth = 0;
         nextYear += 1;
       }
-      return { ...prev, month: nextMonth, year: nextYear };
+      const updatedFields = prev.fields.map(f => {
+        if (f.needsSowing && !f.needsGrowing && f.sownIn !== undefined) {
+          const growth = (prev.growthTimes?.[f.crop] || GROWTH_TIMES[f.crop]) || 0;
+          const elapsed = (nextMonth - f.sownIn + 12) % 12;
+          if (growth > 0 && (elapsed >= growth || (f.sownIn + growth) % 12 === nextMonth)) {
+            return {
+              ...f,
+              isWaiting: true,
+              needsLime: true,
+              needsSlurry: true,
+              needsMulching: true,
+              needsPlowing: true,
+              needsStoneRemoval: true,
+              needsSowing: true,
+              needsGrowing: true,
+              currentTool: getHarvesterToolForCrop(f.crop)
+            };
+          }
+        }
+        return f;
+      });
+      return { ...prev, month: nextMonth, year: nextYear, fields: updatedFields };
     });
   };
 
@@ -864,17 +894,17 @@ const App: React.FC = () => {
                           setActiveTab('fields');
                           setSelectedFieldId(field.number);
                         }}
-                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-emerald-500/50 transition-all group"
+                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-amber-500/50 transition-all group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-emerald-500 transition-colors">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-amber-500 transition-colors">
                             {field.number}
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">{field.crop}</div>
+                            <div className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{field.crop}</div>
                           </div>
                         </div>
-                        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
+                        <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
                           À récolter
                         </div>
                       </button>
@@ -913,17 +943,17 @@ const App: React.FC = () => {
                           setActiveTab('fields');
                           setSelectedFieldId(field.number);
                         }}
-                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-amber-500/50 transition-all group"
+                        className="w-full flex items-center justify-between p-4 bg-slate-800/50 border border-slate-700 rounded-xl hover:bg-slate-700 hover:border-emerald-500/50 transition-all group"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-amber-500 transition-colors">
+                          <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center font-bold text-white group-hover:bg-emerald-500 transition-colors">
                             {field.number}
                           </div>
                           <div>
-                            <div className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{field.crop}</div>
+                            <div className="text-sm font-bold text-white group-hover:text-emerald-400 transition-colors">{field.crop}</div>
                           </div>
                         </div>
-                        <div className="text-xs font-bold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 group-hover:bg-amber-500/20 transition-colors">
+                        <div className="text-xs font-bold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 group-hover:bg-emerald-500/20 transition-colors">
                           Mois prochain
                         </div>
                       </button>
@@ -1139,7 +1169,8 @@ const App: React.FC = () => {
                                     
                                     const isTopPriority = (f: any) => {
                                         if (!f) return true; // Libre -> pas en croissance -> haut de page
-                                        if (!f.needsSowing) return true; // pas en croissance (ex: À Broyer, À Récolter, etc.) -> haut de page
+                                        if (f.needsGrowing) return true; // À Récolter -> haut de page
+                                        if (!f.needsSowing) return true; // pas en croissance (ex: À Broyer, etc.) -> haut de page
                                         const growth = (gameState.growthTimes?.[f.crop] || GROWTH_TIMES[f.crop]) || 0;
                                         const progress = f.sownIn !== undefined ? Math.min((gameState.month - f.sownIn + 12) % 12, growth) : 0;
                                         return growth > 0 && progress === growth; // croissance terminée -> haut de page
