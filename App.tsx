@@ -158,6 +158,15 @@ const App: React.FC = () => {
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [newActionName, setNewActionName] = useState("");
+
+  // Field Modal State
+  const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
+  const [newFieldNumber, setNewFieldNumber] = useState<number>(1);
+  const [newFieldSize, setNewFieldSize] = useState<number>(1.0);
+  const [newFieldCrop, setNewFieldCrop] = useState<CropType>(CropType.GRASS);
+  const [addFieldError, setAddFieldError] = useState<string>("");
+  const [isDeleteFieldConfirmOpen, setIsDeleteFieldConfirmOpen] = useState(false);
+  const [fieldToDelete, setFieldToDelete] = useState<Field | null>(null);
   const [editingId, setEditingId] = useState<{ category: string; index: number } | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
@@ -209,20 +218,77 @@ const App: React.FC = () => {
         if (!parsed.structuredNotes) {
             parsed.structuredNotes = [];
         }
+        // Migration: ensure initial 11 fields exist on first load
+        if (!parsed.fieldsInitialized11) {
+            const existingNumbers = new Set((parsed.fields || []).map((f: Field) => f.number));
+            const initial11: Field[] = [...(parsed.fields || [])];
+            for (let i = 1; i <= 11; i++) {
+                if (!existingNumbers.has(i)) {
+                    initial11.push({
+                        id: Math.random().toString(36).substr(2, 9),
+                        number: i,
+                        size: 1.0,
+                        crop: CropType.GRASS,
+                        status: FieldStatus.FALLOW,
+                        fertilizer: 0,
+                        needsLime: false,
+                        needsPlowing: false,
+                        isWaiting: false,
+                        needsSlurry: false,
+                        needsMulching: false,
+                        needsSowing: false,
+                        needsGrowing: false,
+                        needsStoneRemoval: false,
+                        needsHarvest: false,
+                        yieldPotential: 100,
+                        nextCrop: undefined,
+                        sownIn: 0,
+                        currentTool: 'Aucun'
+                    });
+                }
+            }
+            parsed.fields = initial11;
+            parsed.fieldsInitialized11 = true;
+        }
         return parsed;
       } catch (e) {
         console.error("Error parsing saved game state, resetting:", e);
         localStorage.removeItem('fs22_manager_state');
       }
     }
+    const initialDefaultFields: Field[] = [
+      { id: '1', number: 1, size: 2.5, crop: CropType.WHEAT, status: FieldStatus.GROWING, fertilizer: 50, needsLime: false, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: true, needsStoneRemoval: false, needsHarvest: false, yieldPotential: 95, nextCrop: CropType.BARLEY, sownIn: 9, currentTool: 'Aucun' },
+      { id: '2', number: 2, size: 1.2, crop: CropType.BARLEY, status: FieldStatus.HARVESTING, fertilizer: 100, needsLime: true, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: false, needsStoneRemoval: false, needsHarvest: true, yieldPotential: 110, nextCrop: CropType.CANOLA, sownIn: 9, currentTool: 'Aucun' }
+    ];
+    for (let i = 3; i <= 11; i++) {
+      initialDefaultFields.push({
+        id: Math.random().toString(36).substr(2, 9),
+        number: i,
+        size: 1.0,
+        crop: CropType.GRASS,
+        status: FieldStatus.FALLOW,
+        fertilizer: 0,
+        needsLime: false,
+        needsPlowing: false,
+        isWaiting: false,
+        needsSlurry: false,
+        needsMulching: false,
+        needsSowing: false,
+        needsGrowing: false,
+        needsStoneRemoval: false,
+        needsHarvest: false,
+        yieldPotential: 100,
+        nextCrop: undefined,
+        sownIn: 0,
+        currentTool: 'Aucun'
+      });
+    }
     return {
       money: 500000,
       month: 7, // August (Index starts at 0 for Jan, so 7 is Aug)
       year: 1,
-      fields: [
-        { id: '1', number: 1, size: 2.5, crop: CropType.WHEAT, status: FieldStatus.GROWING, fertilizer: 50, needsLime: false, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: true, needsStoneRemoval: false, needsHarvest: false, yieldPotential: 95, nextCrop: CropType.BARLEY, sownIn: 9, currentTool: 'Aucun' },
-        { id: '2', number: 2, size: 1.2, crop: CropType.BARLEY, status: FieldStatus.HARVESTING, fertilizer: 100, needsLime: true, needsPlowing: false, isWaiting: false, needsSlurry: false, needsMulching: false, needsSowing: false, needsGrowing: false, needsStoneRemoval: false, needsHarvest: true, yieldPotential: 110, nextCrop: CropType.CANOLA, sownIn: 9, currentTool: 'Aucun' }
-      ],
+      fields: initialDefaultFields,
+      fieldsInitialized11: true,
       animals: [
         { id: 'a1', type: AnimalType.COWS, name: 'Moutons', count: 12, health: 90, foodLevel: 80, waterLevel: 100, productivity: 85, lastFed: new Date().toISOString() }
       ],
@@ -336,10 +402,84 @@ const App: React.FC = () => {
     }));
   };
 
-  const addField = () => {
+  const openAddFieldModal = () => {
+    const existingNumbers = new Set(gameState.fields.map(f => f.number));
+    let nextNum = 1;
+    while (existingNumbers.has(nextNum)) {
+      nextNum++;
+    }
+    setNewFieldNumber(nextNum);
+    setNewFieldSize(1.0);
+    setNewFieldCrop(CropType.GRASS);
+    setAddFieldError("");
+    setIsAddFieldModalOpen(true);
+  };
+
+  const handleAddField = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const num = Number(newFieldNumber);
+    if (!num || num < 1) {
+      setAddFieldError("Le numéro du champ doit être un nombre supérieur ou égal à 1.");
+      return;
+    }
+    if (gameState.fields.some(f => f.number === num)) {
+      setAddFieldError(`Le Champ #${num} existe déjà.`);
+      return;
+    }
     const newField: Field = {
       id: Math.random().toString(36).substr(2, 9),
-      number: gameState.fields.length + 1,
+      number: num,
+      size: Number(newFieldSize) || 1.0,
+      crop: newFieldCrop,
+      status: FieldStatus.FALLOW,
+      fertilizer: 0,
+      needsLime: false,
+      needsPlowing: false,
+      isWaiting: false,
+      needsSlurry: false,
+      needsMulching: false,
+      needsSowing: false,
+      needsGrowing: false,
+      needsStoneRemoval: false,
+      needsHarvest: false,
+      yieldPotential: 100,
+      nextCrop: undefined,
+      sownIn: gameState.month,
+      currentTool: 'Aucun',
+      lastCompletedTool: undefined
+    };
+    setGameState(prev => ({ ...prev, fields: [...prev.fields, newField] }));
+    setIsAddFieldModalOpen(false);
+  };
+
+  const promptDeleteField = (field: Field) => {
+    setFieldToDelete(field);
+    setIsDeleteFieldConfirmOpen(true);
+  };
+
+  const handleConfirmDeleteField = () => {
+    if (!fieldToDelete) return;
+    const numToDelete = fieldToDelete.number;
+    setGameState(prev => ({
+      ...prev,
+      fields: prev.fields.filter(f => f.number !== numToDelete)
+    }));
+    if (selectedFieldId === numToDelete) {
+      setSelectedFieldId(null);
+    }
+    setIsDeleteFieldConfirmOpen(false);
+    setFieldToDelete(null);
+  };
+
+  const addField = () => {
+    const existingNumbers = new Set(gameState.fields.map(f => f.number));
+    let nextNum = 1;
+    while (existingNumbers.has(nextNum)) {
+      nextNum++;
+    }
+    const newField: Field = {
+      id: Math.random().toString(36).substr(2, 9),
+      number: nextNum,
       size: 1.0,
       crop: CropType.GRASS,
       status: FieldStatus.FALLOW,
@@ -1140,12 +1280,25 @@ const App: React.FC = () => {
           <div className="space-y-6">
             {selectedFieldId ? (
                 <div className="animate-fade-in">
-                     <button 
-                        onClick={() => setSelectedFieldId(null)}
-                        className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors font-medium mb-4"
-                    >
-                        <span>← Retour à la liste</span>
-                    </button>
+                    <div className="flex justify-between items-center mb-4">
+                        <button 
+                            onClick={() => setSelectedFieldId(null)}
+                            className="flex items-center gap-2 text-slate-400 hover:text-emerald-400 transition-colors font-medium"
+                        >
+                            <span>← Retour à la liste</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const currentField = getFieldByNumber(selectedFieldId);
+                                if (currentField) promptDeleteField(currentField);
+                            }}
+                            className="flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-colors"
+                        >
+                            <Icons.Trash />
+                            <span>Supprimer le champ</span>
+                        </button>
+                    </div>
                     <FieldCard 
                         field={getFieldByNumber(selectedFieldId)} 
                         onUpdate={(updates) => saveFieldByNumber(selectedFieldId, updates)}
@@ -1158,126 +1311,146 @@ const App: React.FC = () => {
                 <>
                     <div className="flex justify-between items-center mb-6">
                       <h2 className="text-2xl font-bold">Vos Champs</h2>
+                      <button 
+                        onClick={openAddFieldModal}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-colors flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                      >
+                        <Icons.Plus />
+                        <span>Ajouter un champ</span>
+                      </button>
                     </div>
                     
                     <div>
-                        <div className="grid grid-cols-2 gap-4">
-                            {Array.from({length: 11}, (_, i) => i + 1)
-                                .sort((a, b) => {
-                                    const fieldA = gameState.fields.find(f => f.number === a);
-                                    const fieldB = gameState.fields.find(f => f.number === b);
+                        {gameState.fields.length > 0 ? (
+                            <div className="grid grid-cols-2 gap-4">
+                                {[...gameState.fields]
+                                    .sort((fieldA, fieldB) => {
+                                        const isTopPriority = (f: Field) => {
+                                            if (f.needsGrowing) return true; // À Récolter -> haut de page
+                                            if (!f.needsSowing) return true; // pas en croissance (ex: À Broyer, etc.) -> haut de page
+                                            const growth = (gameState.growthTimes?.[f.crop] || GROWTH_TIMES[f.crop]) || 0;
+                                            const progress = f.sownIn !== undefined ? Math.min((gameState.month - f.sownIn + 12) % 12, growth) : 0;
+                                            return growth > 0 && progress === growth; // croissance terminée -> haut de page
+                                        };
+
+                                        const topA = isTopPriority(fieldA);
+                                        const topB = isTopPriority(fieldB);
+
+                                        if (topA && !topB) return -1;
+                                        if (!topA && topB) return 1;
+                                        return fieldA.number - fieldB.number;
+                                    })
+                                    .map(field => {
+                                        const num = field.number;
+                                        const currentCropIndex = ROTATION_ORDER.indexOf(field.crop);
+                                        const nextCrop = currentCropIndex !== -1 
+                                            ? ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length] 
+                                            : undefined;
                                     
-                                    const isTopPriority = (f: any) => {
-                                        if (!f) return true; // Libre -> pas en croissance -> haut de page
-                                        if (f.needsGrowing) return true; // À Récolter -> haut de page
-                                        if (!f.needsSowing) return true; // pas en croissance (ex: À Broyer, etc.) -> haut de page
-                                        const growth = (gameState.growthTimes?.[f.crop] || GROWTH_TIMES[f.crop]) || 0;
-                                        const progress = f.sownIn !== undefined ? Math.min((gameState.month - f.sownIn + 12) % 12, growth) : 0;
-                                        return growth > 0 && progress === growth; // croissance terminée -> haut de page
-                                    };
+                                        let statusText = "Libre";
+                                        let statusColor = "text-slate-500";
+                                        let borderColor = "border-slate-700";
+                                        let bgClass = "bg-slate-900/80 hover:bg-slate-800";
+                                        
+                                        if (field.needsGrowing) {
+                                            statusText = "À Récolter";
+                                            statusColor = "text-yellow-400";
+                                            borderColor = "border-yellow-500/30";
+                                        } else if (field.needsSowing) {
+                                            const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 0;
+                                            const progress = field.sownIn !== undefined ? Math.min((gameState.month - field.sownIn + 12) % 12, growth) : 0;
+                                            statusText = `En croissance ${progress}/${growth}`;
+                                            statusColor = "text-emerald-400";
+                                            borderColor = "border-emerald-500/30";
+                                        } else if (field.needsStoneRemoval) {
+                                            statusText = "À semer";
+                                            statusColor = "text-blue-400";
+                                            borderColor = "border-blue-500/30";
+                                        } else if (field.needsPlowing) {
+                                            statusText = "Enlever les pierres";
+                                            statusColor = "text-stone-400";
+                                            borderColor = "border-stone-500/30";
+                                        } else if (field.needsMulching) {
+                                            statusText = "À Labourer";
+                                            statusColor = "text-orange-400";
+                                            borderColor = "border-orange-500/30";
+                                        } else if (field.needsSlurry) {
+                                            statusText = "À Broyer";
+                                            statusColor = "text-rose-400";
+                                            borderColor = "border-rose-500/30";
+                                        } else if (field.needsLime) {
+                                            statusText = "À Amender en lisier";
+                                            statusColor = "text-lime-400";
+                                            borderColor = "border-lime-500/30";
+                                        } else if (field.isWaiting) {
+                                            statusText = "À Chauler";
+                                            statusColor = "text-cyan-400";
+                                            borderColor = "border-cyan-500/30";
+                                        } else {
+                                            statusText = "en attente";
+                                            statusColor = "text-slate-500";
+                                            borderColor = "border-slate-800";
+                                        }
 
-                                    const topA = isTopPriority(fieldA);
-                                    const topB = isTopPriority(fieldB);
-
-                                    if (topA && !topB) return -1;
-                                    if (!topA && topB) return 1;
-                                    return a - b;
-                                })
-                                .map(num => {
-                                    const field = gameState.fields.find(f => f.number === num);
-                                    
-                                    const currentCropIndex = field ? ROTATION_ORDER.indexOf(field.crop) : -1;
-                                    const nextCrop = currentCropIndex !== -1 
-                                        ? ROTATION_ORDER[(currentCropIndex + 1) % ROTATION_ORDER.length] 
-                                        : undefined;
-                                
-                                let statusText = "Libre";
-                                let statusColor = "text-slate-500";
-                                let borderColor = "border-slate-800";
-                                let bgClass = "bg-slate-900";
-
-                                if (field) {
-                                    borderColor = "border-slate-700";
-                                    bgClass = "bg-slate-900/80 hover:bg-slate-800";
-                                    
-                                    if (field.needsGrowing) {
-                                        statusText = "À Récolter";
-                                        statusColor = "text-yellow-400";
-                                        borderColor = "border-yellow-500/30";
-                                    } else if (field.needsSowing) {
-                                        const growth = (gameState.growthTimes?.[field.crop] || GROWTH_TIMES[field.crop]) || 0;
-                                        const progress = field.sownIn !== undefined ? Math.min((gameState.month - field.sownIn + 12) % 12, growth) : 0;
-                                        statusText = `En croissance ${progress}/${growth}`;
-                                        statusColor = "text-emerald-400";
-                                        borderColor = "border-emerald-500/30";
-                                    } else if (field.needsStoneRemoval) {
-                                        statusText = "À semer";
-                                        statusColor = "text-blue-400";
-                                        borderColor = "border-blue-500/30";
-                                    } else if (field.needsPlowing) {
-                                        statusText = "Enlever les pierres";
-                                        statusColor = "text-stone-400";
-                                        borderColor = "border-stone-500/30";
-                                    } else if (field.needsMulching) {
-                                        statusText = "À Labourer";
-                                        statusColor = "text-orange-400";
-                                        borderColor = "border-orange-500/30";
-                                    } else if (field.needsSlurry) {
-                                        statusText = "À Broyer";
-                                        statusColor = "text-rose-400";
-                                        borderColor = "border-rose-500/30";
-                                    } else if (field.needsLime) {
-                                        statusText = "À Amender en lisier";
-                                        statusColor = "text-lime-400";
-                                        borderColor = "border-lime-500/30";
-                                    } else if (field.isWaiting) {
-                                        statusText = "À Chauler";
-                                        statusColor = "text-cyan-400";
-                                        borderColor = "border-cyan-500/30";
-                                    } else {
-                                        statusText = "en attente";
-                                        statusColor = "text-slate-500";
-                                        borderColor = "border-slate-800";
-                                    }
-                                }
-
-                                return (
-                                    <button
-                                        key={num}
-                                        onClick={() => setSelectedFieldId(num)}
-                                        className={`p-4 rounded-xl border flex flex-col items-start gap-2 transition-all ${bgClass} ${borderColor}`}
-                                    >
-                                        <div className="flex justify-between w-full items-center">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${field ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-600'}`}>
-                                                    {num}
-                                                </div>
-                                                <span className={`text-sm font-bold uppercase ${statusColor}`}>{statusText}</span>
-                                            </div>
-                                            {field && (
-                                                <div className="text-slate-600">
-                                                    <Icons.Tractor />
-                                                </div>
-                                            )}
-                                        </div>
-                                        {field && (
-                                            <div className="pl-11">
-                                                {(field.needsGrowing || field.needsSowing || field.needsStoneRemoval || field.needsHarvest) && (
-                                                    <div className="text-xs text-slate-400 font-medium">
-                                                        {(field.needsStoneRemoval && !field.needsSowing) && nextCrop ? nextCrop : field.crop}
+                                        return (
+                                            <div
+                                                key={field.id || num}
+                                                onClick={() => setSelectedFieldId(num)}
+                                                className={`p-4 rounded-xl border flex flex-col items-start gap-2 transition-all cursor-pointer relative group text-left ${bgClass} ${borderColor}`}
+                                            >
+                                                <div className="flex justify-between w-full items-center">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold bg-slate-700 text-white">
+                                                            {num}
+                                                        </div>
+                                                        <span className={`text-sm font-bold uppercase ${statusColor}`}>{statusText}</span>
                                                     </div>
-                                                )}
-                                                {field.currentTool !== 'Aucun' && (
-                                                    <div className="text-xs text-emerald-500/90 mt-1 font-semibold">
-                                                        {field.currentTool} en cours
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="text-slate-600">
+                                                            <Icons.Tractor />
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                promptDeleteField(field);
+                                                            }}
+                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                                            title="Supprimer ce champ"
+                                                        >
+                                                            <Icons.Trash />
+                                                        </button>
                                                     </div>
-                                                )}
+                                                </div>
+                                                <div className="pl-11">
+                                                    {(field.needsGrowing || field.needsSowing || field.needsStoneRemoval || field.needsHarvest) && (
+                                                        <div className="text-xs text-slate-400 font-medium">
+                                                            {(field.needsStoneRemoval && !field.needsSowing) && nextCrop ? nextCrop : field.crop}
+                                                        </div>
+                                                    )}
+                                                    {field.currentTool !== 'Aucun' && (
+                                                        <div className="text-xs text-emerald-500/90 mt-1 font-semibold">
+                                                            {field.currentTool} en cours
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                                        );
+                                    })}
+                            </div>
+                        ) : (
+                            <div className="text-center py-12 border-2 border-dashed border-slate-800 rounded-2xl p-8">
+                                <p className="text-slate-400 text-base font-semibold mb-2">Aucun champ enregistré</p>
+                                <p className="text-slate-500 text-sm mb-4">Ajoutez un premier champ pour commencer à gérer vos cultures.</p>
+                                <button
+                                    onClick={openAddFieldModal}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-colors inline-flex items-center gap-2 shadow-lg shadow-emerald-600/20"
+                                >
+                                    <Icons.Plus />
+                                    <span>Ajouter un champ</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
@@ -2158,6 +2331,108 @@ const App: React.FC = () => {
                   Valider
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Field Confirmation Modal */}
+        {isDeleteFieldConfirmOpen && fieldToDelete && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-2">Supprimer le champ ?</h3>
+              <p className="text-slate-400 text-sm mb-6">
+                Êtes-vous sûr de vouloir supprimer le <span className="text-emerald-400 font-bold">Champ #{fieldToDelete.number}</span> ? Cette action est irréversible.
+              </p>
+              <div className="flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    setIsDeleteFieldConfirmOpen(false);
+                    setFieldToDelete(null);
+                  }}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleConfirmDeleteField}
+                  className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors shadow-lg shadow-red-500/20"
+                >
+                  Supprimer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Field Modal */}
+        {isAddFieldModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-4">Ajouter un champ</h3>
+              
+              <form onSubmit={handleAddField} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Numéro du champ</label>
+                  <input 
+                    type="number"
+                    min="1"
+                    value={newFieldNumber}
+                    onChange={(e) => {
+                      setNewFieldNumber(parseInt(e.target.value) || 0);
+                      setAddFieldError('');
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Superficie (ha)</label>
+                  <input 
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={newFieldSize}
+                    onChange={(e) => setNewFieldSize(parseFloat(e.target.value) || 1.0)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Culture initiale</label>
+                  <select
+                    value={newFieldCrop}
+                    onChange={(e) => setNewFieldCrop(e.target.value as CropType)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
+                  >
+                    {Object.values(CropType).map(crop => (
+                      <option key={crop} value={crop}>{crop}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {addFieldError && (
+                  <p className="text-red-400 text-sm font-medium">{addFieldError}</p>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setIsAddFieldModalOpen(false)}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                  >
+                    Ajouter
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
