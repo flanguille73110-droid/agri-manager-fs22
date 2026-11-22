@@ -121,5 +121,6 @@ export interface GameState {
   notes?: string; // Keep for migration
   structuredNotes?: Note[];
   customActions?: string[];
+  customEnclosures?: string[];
   fieldsInitialized11?: boolean;
 }

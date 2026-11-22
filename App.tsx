@@ -156,8 +156,11 @@ const App: React.FC = () => {
   const [menuToDelete, setMenuToDelete] = useState<string | null>(null);
   const [newMenuName, setNewMenuName] = useState("");
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+  const [isEnclosureModalOpen, setIsEnclosureModalOpen] = useState(false);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [newActionName, setNewActionName] = useState("");
+  const [newEnclosureName, setNewEnclosureName] = useState("");
+  const BASE_ENCLOSURES = ['Cochons', 'Moutons', 'Poules', 'Vaches'];
 
   // Field Modal State
   const [isAddFieldModalOpen, setIsAddFieldModalOpen] = useState(false);
@@ -213,6 +216,10 @@ const App: React.FC = () => {
         // Migration for customActions
         if (!parsed.customActions) {
             parsed.customActions = [];
+        }
+        // Migration for customEnclosures
+        if (!parsed.customEnclosures) {
+            parsed.customEnclosures = [];
         }
         // Migration for structuredNotes
         if (!parsed.structuredNotes) {
@@ -297,6 +304,7 @@ const App: React.FC = () => {
       growthTimes: GROWTH_TIMES,
       notes: "",
       customActions: [],
+      customEnclosures: [],
       structuredNotes: []
     };
   });
@@ -321,6 +329,21 @@ const App: React.FC = () => {
       }));
       setNewActionName("");
       setIsActionModalOpen(false);
+    }
+  };
+
+  const handleSaveEnclosure = () => {
+    const trimmed = newEnclosureName.trim();
+    if (trimmed) {
+      const existing = new Set([...BASE_ENCLOSURES, ...(gameState.customEnclosures || [])].map(e => e.toLowerCase()));
+      if (!existing.has(trimmed.toLowerCase())) {
+        setGameState(prev => ({
+          ...prev,
+          customEnclosures: [...(prev.customEnclosures || []), trimmed]
+        }));
+      }
+      setNewEnclosureName("");
+      setIsEnclosureModalOpen(false);
     }
   };
 
@@ -389,6 +412,13 @@ const App: React.FC = () => {
     setGameState(prev => ({
       ...prev,
       customActions: (prev.customActions || []).filter((_, i) => i !== index)
+    }));
+  };
+
+  const deleteEnclosure = (index: number) => {
+    setGameState(prev => ({
+      ...prev,
+      customEnclosures: (prev.customEnclosures || []).filter((_, i) => i !== index)
     }));
   };
 
@@ -2191,6 +2221,45 @@ const App: React.FC = () => {
                       </div>
                     )}
                   </div>
+
+                  <div className="border-t border-slate-800 pt-6 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <div>
+                        <h3 className="text-xl font-bold text-white">Enclos / Productions</h3>
+                        <p className="text-slate-400 text-sm">Gérez vos enclos et productions personnalisés pour les notes.</p>
+                      </div>
+                      <button 
+                        onClick={() => setIsEnclosureModalOpen(true)}
+                        className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 group"
+                      >
+                        <Icons.Plus className="group-hover:rotate-90 transition-transform" />
+                        <span>Ajouter un enclos / production</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {BASE_ENCLOSURES.map((enclos) => (
+                        <div key={`base-${enclos}`} className="bg-slate-800/30 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
+                          <span className="font-bold text-slate-300">{enclos}</span>
+                          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+                            De base
+                          </span>
+                        </div>
+                      ))}
+                      {(gameState.customEnclosures || []).map((enclos, index) => (
+                        <div key={`custom-${index}`} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex justify-between items-center group">
+                          <span className="font-bold text-slate-200">{enclos}</span>
+                          <button 
+                            onClick={() => deleteEnclosure(index)}
+                            className="text-slate-500 hover:text-red-400 transition-colors p-1 opacity-0 group-hover:opacity-100"
+                            title="Supprimer"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -2239,6 +2308,49 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* Enclosure / Production Modal */}
+        {isEnclosureModalOpen && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-slate-900 border border-slate-700 p-6 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in">
+              <h3 className="text-xl font-bold text-white mb-4">Ajouter un enclos / production</h3>
+              
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-xs text-slate-400 font-bold uppercase">Nom de l'enclos ou de la production</label>
+                  <input 
+                    type="text"
+                    value={newEnclosureName}
+                    onChange={(e) => setNewEnclosureName(e.target.value)}
+                    placeholder="Ex: Production de TMR"
+                    autoFocus
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none placeholder:text-slate-600"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveEnclosure()}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={() => {
+                    setIsEnclosureModalOpen(false);
+                    setNewEnclosureName("");
+                  }}
+                  className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors"
+                >
+                  Annuler
+                </button>
+                <button 
+                  onClick={handleSaveEnclosure}
+                  disabled={!newEnclosureName.trim()}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold transition-colors shadow-lg shadow-emerald-500/20"
+                >
+                  Valider
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Note Modal */}
         {isNoteModalOpen && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -2263,16 +2375,19 @@ const App: React.FC = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs text-slate-400 font-bold uppercase">Enclos</label>
+                  <label className="text-xs text-slate-400 font-bold uppercase">Enclos / Production</label>
                   <select 
                     value={noteForm.enclos}
                     onChange={(e) => setNoteForm({ ...noteForm, enclos: e.target.value })}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-200 focus:border-emerald-500 outline-none"
                   >
-                    <option value="Cochons">Cochons</option>
-                    <option value="Moutons">Moutons</option>
-                    <option value="Poules">Poules</option>
-                    <option value="Vaches">Vaches</option>
+                    {Array.from(new Set([
+                      ...BASE_ENCLOSURES,
+                      ...(gameState.customEnclosures || []),
+                      ...(noteForm.enclos ? [noteForm.enclos] : [])
+                    ])).map((enclos, idx) => (
+                      <option key={idx} value={enclos}>{enclos}</option>
+                    ))}
                   </select>
                 </div>
 
